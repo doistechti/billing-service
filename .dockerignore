@@ -1,0 +1,13 @@
+.git
+.idea
+.DS_Store
+
+**/target
+**/.classpath
+**/.project
+**/.settings
+
+*.log
+*.tmp
+
+billing-service-sdd.zip
