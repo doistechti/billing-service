@@ -4,6 +4,7 @@ import com.doistech.billingservice.api.BillingApi.CreateChargeRequest;
 import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.invoice.InvoiceRepository;
 import com.doistech.billingservice.core.invoice.InvoiceStatus;
+import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.gateway.mercadopago.ChargeGatewayResponse;
 import com.doistech.billingservice.gateway.mercadopago.PaymentGatewayService;
 import com.doistech.billingservice.shared.BusinessRuleException;
@@ -32,6 +33,10 @@ public class ChargeService {
 
     @Transactional
     public Charge create(CreateChargeRequest request) {
+        if (request.gateway() != Gateway.MERCADO_PAGO) {
+            throw new BusinessRuleException("unsupported payment gateway");
+        }
+
         Invoice invoice = invoiceRepository.findDetailedById(request.invoiceId())
                 .orElseThrow(() -> new NotFoundException("invoice not found"));
 

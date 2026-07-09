@@ -3,6 +3,7 @@ package com.doistech.billingservice.webhook;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.doistech.billingservice.core.charge.Charge;
@@ -27,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class MercadoPagoWebhookServiceTest {
@@ -55,6 +57,7 @@ class MercadoPagoWebhookServiceTest {
     void shouldProcessApprovedWebhookWithoutDuplicatingPayment() {
         UUID invoiceId = UUID.randomUUID();
         Invoice invoice = new Invoice();
+        ReflectionTestUtils.setField(invoice, "id", invoiceId);
         invoice.setStatus(InvoiceStatus.WAITING_PAYMENT);
 
         Charge charge = new Charge();
@@ -71,7 +74,7 @@ class MercadoPagoWebhookServiceTest {
                 "INVOICE:%s|SOURCE:MATER_ECCLESIAE|REF:ALUNO-123".formatted(invoiceId),
                 objectMapper.createObjectNode().put("status", "approved")
         ));
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
         when(chargeRepository.findFirstByInvoiceIdOrderByCreatedAtDesc(invoiceId)).thenReturn(Optional.of(charge));
         when(paymentRepository.existsByGatewayAndGatewayPaymentId(Gateway.MERCADO_PAGO, "123456")).thenReturn(false);
 
@@ -84,6 +87,35 @@ class MercadoPagoWebhookServiceTest {
         verify(paymentRepository).save(paymentCaptor.capture());
         assertEquals("123456", paymentCaptor.getValue().getGatewayPaymentId());
         assertEquals(ChargeStatus.PAID, charge.getStatus());
+        assertEquals(InvoiceStatus.PAID, invoice.getStatus());
+    }
+
+    @Test
+    void shouldIgnoreWebhookWhenInvoiceIsAlreadyPaid() {
+        UUID invoiceId = UUID.randomUUID();
+        Invoice invoice = new Invoice();
+        ReflectionTestUtils.setField(invoice, "id", invoiceId);
+        invoice.setStatus(InvoiceStatus.PAID);
+
+        when(webhookEventRepository.save(any(WebhookEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(paymentGatewayService.getPayment("123456")).thenReturn(new GatewayPaymentResponse(
+                Gateway.MERCADO_PAGO,
+                "123456",
+                "rejected",
+                new BigDecimal("150.00"),
+                null,
+                "INVOICE:%s|SOURCE:MATER_ECCLESIAE|REF:ALUNO-123".formatted(invoiceId),
+                objectMapper.createObjectNode().put("status", "rejected")
+        ));
+        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
+
+        var payload = objectMapper.createObjectNode();
+        payload.putObject("data").put("id", "123456");
+
+        webhookService.receive(payload);
+
+        verify(chargeRepository, never()).save(any(Charge.class));
+        verify(paymentRepository, never()).save(any(Payment.class));
         assertEquals(InvoiceStatus.PAID, invoice.getStatus());
     }
 }

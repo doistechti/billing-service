@@ -65,6 +65,14 @@ public class MercadoPagoWebhookService {
 
             GatewayPaymentResponse paymentResponse = paymentGatewayService.getPayment(event.getGatewayPaymentId());
             Invoice invoice = resolveInvoice(paymentResponse);
+
+            if (invoice.getStatus() == InvoiceStatus.PAID) {
+                event.setProcessed(true);
+                event.setProcessedAt(LocalDateTime.now());
+                webhookEventRepository.save(event);
+                return;
+            }
+
             Charge charge = chargeRepository.findFirstByInvoiceIdOrderByCreatedAtDesc(invoice.getId())
                     .orElseThrow(() -> new BusinessRuleException("charge not found for invoice"));
 

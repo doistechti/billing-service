@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceServiceTest {
@@ -75,9 +76,10 @@ class InvoiceServiceTest {
     void shouldRejectCancelPaidInvoice() {
         UUID invoiceId = UUID.randomUUID();
         Invoice invoice = new Invoice();
+        ReflectionTestUtils.setField(invoice, "id", invoiceId);
         invoice.setStatus(InvoiceStatus.PAID);
 
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
 
         assertThrows(BusinessRuleException.class, () -> invoiceService.cancel(invoiceId));
     }
