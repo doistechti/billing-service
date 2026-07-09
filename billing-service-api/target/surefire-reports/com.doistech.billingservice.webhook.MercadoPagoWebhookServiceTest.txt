@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.doistech.billingservice.webhook.MercadoPagoWebhookServiceTest
 -------------------------------------------------------------------------------
-Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.063 s -- in com.doistech.billingservice.webhook.MercadoPagoWebhookServiceTest
+Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.011 s -- in com.doistech.billingservice.webhook.MercadoPagoWebhookServiceTest
