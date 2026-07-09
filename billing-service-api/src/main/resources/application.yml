@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: billing-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/billing_service}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-message: always
+
+logging:
+  level:
+    com.doistech.billingservice: INFO
+
+springdoc:
+  api-docs:
+    path: /api/docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  security:
+    api-key-header: X-API-Key
+    api-key: ${INTERNAL_API_KEY:change-me}
+
+mercado-pago:
+  base-url: ${MERCADO_PAGO_BASE_URL:https://api.mercadopago.com}
+  access-token: ${MERCADO_PAGO_ACCESS_TOKEN:}
+  public-key: ${MERCADO_PAGO_PUBLIC_KEY:}
+  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:}
+  notification-url: ${APP_BASE_URL:http://localhost:8080}/api/webhooks/mercado-pago
