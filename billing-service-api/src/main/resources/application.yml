@@ -39,6 +39,7 @@ app:
     api-key-header: X-API-Key
     api-key: ${INTERNAL_API_KEY:0ebb5a27ce2dcbd886d49fec60f8bc99}
 
+
 mercado-pago:
   base-url: ${MERCADO_PAGO_BASE_URL:https://api.mercadopago.com}
   access-token: ${MERCADO_PAGO_ACCESS_TOKEN:APP_USR-2169667340333844-070914-b0d074191686a4c213d60cd5048b727d-3313854838}
