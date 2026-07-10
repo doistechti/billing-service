@@ -36,7 +36,7 @@ springdoc:
 
 app:
   security:
-    api-key-header: 981de06f5e5f49fcbe0ee209692f6d5a
+    api-key-header: X-API-Key
     api-key: ${INTERNAL_API_KEY:0ebb5a27ce2dcbd886d49fec60f8bc99}
 
 mercado-pago:
