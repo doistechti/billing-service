@@ -1,0 +1,9 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Fri Jul 10 00:44:40 UTC 2026
+https\://s3.amazonaws.com/redshift-maven-repository/release/.error=
+https\://repo.gradle.org/gradle/libs-releases-local/.lastUpdated=1783644280202
+https\://s3.amazonaws.com/redshift-maven-repository/release/.lastUpdated=1783644280381
+https\://repo.gradle.org/gradle/libs-releases-local/.error=
+https\://maven.pkg.github.com/flyway/flyway-community-db-support/.error=Could not transfer artifact com.google.cloud\:google-cloud-service-management-bom\:pom\:3.27.0 from/to flyway-community-db-support (https\://maven.pkg.github.com/flyway/flyway-community-db-support)\: status code\: 401, reason phrase\: Unauthorized (401)
+@default-flyway-community-db-support-https\://maven.pkg.github.com/flyway/flyway-community-db-support/.lastUpdated=1783644280520
+https\://maven-central.storage-download.googleapis.com/maven2/.lastUpdated=1783644280756

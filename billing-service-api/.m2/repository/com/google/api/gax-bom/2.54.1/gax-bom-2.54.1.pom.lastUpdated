@@ -1,0 +1,9 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Fri Jul 10 00:42:45 UTC 2026
+https\://s3.amazonaws.com/redshift-maven-repository/release/.error=
+https\://repo.gradle.org/gradle/libs-releases-local/.lastUpdated=1783644164992
+https\://s3.amazonaws.com/redshift-maven-repository/release/.lastUpdated=1783644165140
+https\://repo.gradle.org/gradle/libs-releases-local/.error=
+https\://maven.pkg.github.com/flyway/flyway-community-db-support/.error=Could not transfer artifact com.google.api\:gax-bom\:pom\:2.54.1 from/to flyway-community-db-support (https\://maven.pkg.github.com/flyway/flyway-community-db-support)\: status code\: 401, reason phrase\: Unauthorized (401)
+@default-flyway-community-db-support-https\://maven.pkg.github.com/flyway/flyway-community-db-support/.lastUpdated=1783644165276
+https\://maven-central.storage-download.googleapis.com/maven2/.lastUpdated=1783644165451

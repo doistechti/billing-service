@@ -2,9 +2,9 @@ spring:
   application:
     name: billing-service
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/billing_service}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DB_URL:${DATABASE_URL:jdbc:postgresql://${DB_HOST:${POSTGRES_HOST:localhost}}:${DB_PORT:${POSTGRES_PORT:5433}}/${DB_NAME:${POSTGRES_DB:billing_service}}}}
+    username: ${DB_USERNAME:${DATABASE_USERNAME:${DB_USER:${POSTGRES_USER:postgres}}}}
+    password: ${DB_PASSWORD:${DATABASE_PASSWORD:${POSTGRES_PASSWORD:postgres}}}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -41,7 +41,7 @@ app:
 
 mercado-pago:
   base-url: ${MERCADO_PAGO_BASE_URL:https://api.mercadopago.com}
-  access-token: ${MERCADO_PAGO_ACCESS_TOKEN:}
-  public-key: ${MERCADO_PAGO_PUBLIC_KEY:}
-  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:}
+  access-token: ${MERCADO_PAGO_ACCESS_TOKEN:APP_USR-2169667340333844-070914-b0d074191686a4c213d60cd5048b727d-3313854838}
+  public-key: ${MERCADO_PAGO_PUBLIC_KEY:APP_USR-dd97f0c7-e6be-4a5d-9ba6-ae726620b0f6}
+  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:43bbfd800b697bfb3ae9742f999906656bd1eda75a9be9c3b5f94c283798aeaa}
   notification-url: ${APP_BASE_URL:http://localhost:8080}/api/webhooks/mercado-pago

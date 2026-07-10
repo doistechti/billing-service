@@ -1,0 +1,12 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Jul 09 21:51:42 BRT 2026
+https\://s3.amazonaws.com/redshift-maven-repository/release/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-toml\:pom\:2.17.2 from/to redshift (https\://s3.amazonaws.com/redshift-maven-repository/release/)\: s3.amazonaws.com\: nodename nor servname provided, or not known
+@default-central-https\://repo.maven.apache.org/maven2/.lastUpdated=1783644702692
+@default-repo.gradle.org-https\://repo.gradle.org/gradle/libs-releases-local/.lastUpdated=1783644702703
+https\://repo1.maven.org/maven2/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-toml\:pom\:2.17.2 from/to maven-central (https\://repo1.maven.org/maven2)\: repo1.maven.org\: nodename nor servname provided, or not known
+https\://repo.gradle.org/gradle/libs-releases-local/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-toml\:pom\:2.17.2 from/to repo.gradle.org (https\://repo.gradle.org/gradle/libs-releases-local/)\: repo.gradle.org\: nodename nor servname provided, or not known
+https\://repo.maven.apache.org/maven2/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-toml\:pom\:2.17.2 from/to central (https\://repo.maven.apache.org/maven2)\: repo.maven.apache.org
+@default-redshift-https\://s3.amazonaws.com/redshift-maven-repository/release/.lastUpdated=1783644702710
+https\://maven.pkg.github.com/flyway/flyway-community-db-support/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-toml\:pom\:2.17.2 from/to flyway-community-db-support (https\://maven.pkg.github.com/flyway/flyway-community-db-support)\: maven.pkg.github.com\: nodename nor servname provided, or not known
+@default-maven-central-https\://repo1.maven.org/maven2/.lastUpdated=1783644702698
+@default-flyway-community-db-support-https\://maven.pkg.github.com/flyway/flyway-community-db-support/.lastUpdated=1783644702717

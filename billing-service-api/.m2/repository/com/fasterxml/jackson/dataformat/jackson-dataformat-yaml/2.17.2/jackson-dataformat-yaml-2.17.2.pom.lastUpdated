@@ -1,0 +1,8 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Thu Jul 09 21:51:42 BRT 2026
+@default-spring-release-https\://repo.spring.io/release/.lastUpdated=1783644702881
+@default-central-https\://repo.maven.apache.org/maven2/.lastUpdated=1783644702875
+https\://repo.spring.io/snapshot/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-yaml\:pom\:2.17.2 from/to spring-snapshot (https\://repo.spring.io/snapshot)\: repo.spring.io
+@default-spring-snapshot-https\://repo.spring.io/snapshot/.lastUpdated=1783644702886
+https\://repo.maven.apache.org/maven2/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-yaml\:pom\:2.17.2 from/to central (https\://repo.maven.apache.org/maven2)\: repo.maven.apache.org
+https\://repo.spring.io/release/.error=Could not transfer artifact com.fasterxml.jackson.dataformat\:jackson-dataformat-yaml\:pom\:2.17.2 from/to spring-release (https\://repo.spring.io/release)\: repo.spring.io\: nodename nor servname provided, or not known

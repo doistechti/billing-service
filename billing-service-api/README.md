@@ -17,6 +17,7 @@ API backend do `billing-service` para gerenciamento de clientes, invoices, charg
 
 ```text
 billing-service-api
+├── compose.yaml
 ├── docs
 │   └── modelo-de-dominio.md
 ├── src
@@ -102,6 +103,8 @@ MERCADO_PAGO_PUBLIC_KEY=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_WEBHOOK_SECRET=xxxxxxxxxxxxxxxx
 APP_BASE_URL=http://localhost:8080
 ```
+
+A aplicacao tambem aceita `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD`.
 
 ## Configuração
 
@@ -215,6 +218,8 @@ Se o pagamento estiver aprovado:
 - atualiza `charge`
 - atualiza `invoice`
 
+Sem webhook valido do Mercado Pago, a cobranca nao muda para `PAID` no banco.
+
 ## Exemplo de uso
 
 ### Criar customer
@@ -272,14 +277,51 @@ curl -X POST http://localhost:8080/api/charges \
 Pré-requisitos:
 
 - Java 17
-- PostgreSQL
+- Docker + Docker Compose
 - Maven 3.9+ ou wrapper Maven
 
 Passos:
 
-1. criar o banco PostgreSQL
+1. subir o banco PostgreSQL
 2. exportar as variáveis de ambiente
 3. iniciar a aplicação
+
+### Subir o banco com Docker Compose
+
+O projeto inclui um compose local em [`compose.yaml`](</Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/compose.yaml>) com PostgreSQL 16.
+
+Suba o banco com:
+
+```bash
+docker compose up -d
+```
+
+O container será criado com:
+
+- database: `billing_service`
+- user: `postgres`
+- password: `postgres`
+- port: `5433`
+
+Para parar:
+
+```bash
+docker compose down
+```
+
+Para parar removendo o volume:
+
+```bash
+docker compose down -v
+```
+
+### Variáveis compatíveis com o compose local
+
+```env
+DB_URL=jdbc:postgresql://localhost:5433/billing_service
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+```
 
 Exemplo:
 

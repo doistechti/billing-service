@@ -1,3 +1,0 @@
-com\doistech\billingservice\core\invoice\InvoiceServiceTest.class
-com\doistech\billingservice\webhook\MercadoPagoWebhookServiceTest.class
-com\doistech\billingservice\core\charge\ChargeServiceTest.class
