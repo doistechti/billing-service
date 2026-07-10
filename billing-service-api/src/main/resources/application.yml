@@ -37,7 +37,7 @@ springdoc:
 app:
   security:
     api-key-header: X-API-Key
-    api-key: ${INTERNAL_API_KEY}
+    api-key: ${INTERNAL_API_KEY:0ebb5a27ce2dcbd886d49fec60f8bc99}
 
 mercado-pago:
   base-url: ${MERCADO_PAGO_BASE_URL:https://api.mercadopago.com}

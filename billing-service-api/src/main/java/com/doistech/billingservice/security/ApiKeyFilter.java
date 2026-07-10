@@ -7,6 +7,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.AuthorityUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -32,6 +35,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String requestApiKey = request.getHeader(properties.apiKeyHeader());
         if (!StringUtils.hasText(properties.apiKey()) || properties.apiKey().equals(requestApiKey)) {
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    "api-key",
+                    null,
+                    AuthorityUtils.createAuthorityList("ROLE_API"));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
             filterChain.doFilter(request, response);
             return;
         }
