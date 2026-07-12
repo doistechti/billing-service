@@ -24,6 +24,7 @@ MERCADO_PAGO_ACCESS_TOKEN=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_PUBLIC_KEY=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_WEBHOOK_SECRET=xxxxxxxxxxxxxxxx
 APP_BASE_URL=https://seu-dominio.com
+APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
 ```
 
 Formatos alternativos aceitos pela aplicacao:
@@ -91,3 +92,22 @@ Endpoint publico:
 ```text
 GET /api/health
 ```
+
+## Frontend separado no EasyPanel
+
+Se o frontend React subir como outro servico:
+
+1. publique [`frontend/Dockerfile`](</Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/frontend/Dockerfile>)
+2. configure no container do frontend:
+
+```env
+API_BASE_URL=https://api.seu-dominio.com
+```
+
+3. configure no backend:
+
+```env
+APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+```
+
+Se quiser manter tudo sem CORS, publique o frontend e a API sob o mesmo dominio com proxy reverso. Se os servicos tiverem dominios diferentes, essa variavel de CORS deixa de ser opcional.

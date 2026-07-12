@@ -24,7 +24,8 @@ public class ApiKeyFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/webhooks")
+        return "OPTIONS".equalsIgnoreCase(request.getMethod())
+                || path.startsWith("/api/webhooks")
                 || path.startsWith("/api/health")
                 || path.startsWith("/api/docs")
                 || path.startsWith("/swagger-ui");

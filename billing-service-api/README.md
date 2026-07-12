@@ -188,6 +188,47 @@ Quando a aplicação estiver rodando:
 - OpenAPI JSON: `/api/docs`
 - Swagger UI: `/swagger-ui.html`
 
+## Interface React de teste
+
+Foi adicionada uma interface React em [`frontend`](</Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/frontend>) para testar o fluxo manual da integração:
+
+- criar `customer`
+- criar `invoice`
+- criar `charge`
+- abrir `paymentUrl`
+- acompanhar `invoice`, `charges` e `payments`
+
+Execução local:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Por padrão o Vite faz proxy de `/api` para `http://localhost:8080`.
+
+Se o backend estiver em outra URL:
+
+```bash
+cd frontend
+VITE_API_BASE_URL=http://localhost:8081 npm run dev
+```
+
+## Frontend separado
+
+O frontend agora pode ser publicado como aplicação independente no EasyPanel usando [`frontend/Dockerfile`](</Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/frontend/Dockerfile>).
+
+Variáveis importantes:
+
+```env
+API_BASE_URL=https://billing-service-billing-service-api.moftjl.easypanel.host
+APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+```
+
+- `API_BASE_URL`: usada pelo frontend em produção
+- `APP_CORS_ALLOWED_ORIGINS`: usada no backend para aceitar chamadas do domínio do frontend
+
 ## Fluxo principal
 
 ## 1. Criar customer
