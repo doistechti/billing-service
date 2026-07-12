@@ -36,7 +36,7 @@ springdoc:
 
 app:
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4173,http://127.0.0.1:4173}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://billing-service-billing-service-portal.moftjl.easypanel.host,http://localhost:4173,http://127.0.0.1:4173}
   security:
     api-key-header: X-API-Key
     api-key: ${INTERNAL_API_KEY:0ebb5a27ce2dcbd886d49fec60f8bc99}

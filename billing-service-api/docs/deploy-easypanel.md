@@ -24,7 +24,7 @@ MERCADO_PAGO_ACCESS_TOKEN=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_PUBLIC_KEY=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_WEBHOOK_SECRET=xxxxxxxxxxxxxxxx
 APP_BASE_URL=https://seu-dominio.com
-APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+APP_CORS_ALLOWED_ORIGINS=https://billing-service-billing-service-portal.moftjl.easypanel.host
 ```
 
 Formatos alternativos aceitos pela aplicacao:
@@ -107,7 +107,7 @@ API_BASE_URL=https://api.seu-dominio.com
 3. configure no backend:
 
 ```env
-APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+APP_CORS_ALLOWED_ORIGINS=https://billing-service-billing-service-portal.moftjl.easypanel.host
 ```
 
 Se quiser manter tudo sem CORS, publique o frontend e a API sob o mesmo dominio com proxy reverso. Se os servicos tiverem dominios diferentes, essa variavel de CORS deixa de ser opcional.

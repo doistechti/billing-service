@@ -223,7 +223,7 @@ Variáveis importantes:
 
 ```env
 API_BASE_URL=https://billing-service-billing-service-api.moftjl.easypanel.host
-APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+APP_CORS_ALLOWED_ORIGINS=https://billing-service-billing-service-portal.moftjl.easypanel.host
 ```
 
 - `API_BASE_URL`: usada pelo frontend em produção

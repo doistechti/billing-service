@@ -44,5 +44,5 @@ Essa URL precisa apontar para o backend Java publicado.
 Se o frontend e a API estiverem em dominios diferentes, configure tambem no backend:
 
 ```env
-APP_CORS_ALLOWED_ORIGINS=https://frontend.seu-dominio.com
+APP_CORS_ALLOWED_ORIGINS=https://billing-service-billing-service-portal.moftjl.easypanel.host
 ```
