@@ -57,6 +57,12 @@ public class MercadoPagoWebhookService {
         event.setPayload(payload);
         event.setProcessed(false);
         webhookEventRepository.save(event);
+        log.info(
+                "mercado pago webhook received eventRecordId={} eventId={} eventType={} paymentId={}",
+                event.getId(),
+                event.getEventId(),
+                event.getEventType(),
+                event.getGatewayPaymentId());
 
         try {
             if (!StringUtils.hasText(event.getGatewayPaymentId())) {
@@ -65,11 +71,23 @@ public class MercadoPagoWebhookService {
 
             GatewayPaymentResponse paymentResponse = paymentGatewayService.getPayment(event.getGatewayPaymentId());
             Invoice invoice = resolveInvoice(paymentResponse);
+            log.info(
+                    "webhook resolved invoice eventRecordId={} paymentId={} invoiceId={} invoiceStatus={} gatewayStatus={}",
+                    event.getId(),
+                    paymentResponse.gatewayPaymentId(),
+                    invoice.getId(),
+                    invoice.getStatus(),
+                    paymentResponse.gatewayStatus());
 
             if (invoice.getStatus() == InvoiceStatus.PAID) {
                 event.setProcessed(true);
                 event.setProcessedAt(LocalDateTime.now());
                 webhookEventRepository.save(event);
+                log.info(
+                        "webhook ignored because invoice already paid eventRecordId={} paymentId={} invoiceId={}",
+                        event.getId(),
+                        paymentResponse.gatewayPaymentId(),
+                        invoice.getId());
                 return;
             }
 
@@ -87,23 +105,62 @@ public class MercadoPagoWebhookService {
                 payment.setPaidAt(paymentResponse.paidAt());
                 payment.setRawResponse(paymentResponse.rawResponse());
                 paymentRepository.save(payment);
+                log.info(
+                        "payment created from webhook eventRecordId={} paymentId={} invoiceId={} chargeId={} amount={} gatewayStatus={}",
+                        event.getId(),
+                        paymentResponse.gatewayPaymentId(),
+                        invoice.getId(),
+                        charge.getId(),
+                        paymentResponse.amount(),
+                        paymentResponse.gatewayStatus());
+            } else {
+                log.info(
+                        "payment already exists for webhook eventRecordId={} paymentId={} invoiceId={}",
+                        event.getId(),
+                        paymentResponse.gatewayPaymentId(),
+                        invoice.getId());
             }
 
             charge.setGatewayPaymentId(paymentResponse.gatewayPaymentId());
             charge.setStatus(mapChargeStatus(paymentResponse.gatewayStatus()));
             chargeRepository.save(charge);
+            log.info(
+                    "charge updated from webhook eventRecordId={} chargeId={} invoiceId={} chargeStatus={} paymentId={}",
+                    event.getId(),
+                    charge.getId(),
+                    invoice.getId(),
+                    charge.getStatus(),
+                    paymentResponse.gatewayPaymentId());
 
             if (charge.getStatus() == ChargeStatus.PAID && invoice.getStatus() != InvoiceStatus.PAID) {
                 invoice.setStatus(InvoiceStatus.PAID);
                 invoice.setPaidAt(Optional.ofNullable(paymentResponse.paidAt()).orElse(LocalDateTime.now()));
                 invoiceRepository.save(invoice);
+                log.info(
+                        "invoice marked paid from webhook eventRecordId={} invoiceId={} paidAt={}",
+                        event.getId(),
+                        invoice.getId(),
+                        invoice.getPaidAt());
             }
 
             event.setProcessed(true);
             event.setProcessedAt(LocalDateTime.now());
             webhookEventRepository.save(event);
+            log.info(
+                    "mercado pago webhook processed successfully eventRecordId={} eventId={} paymentId={} invoiceId={}",
+                    event.getId(),
+                    event.getEventId(),
+                    paymentResponse.gatewayPaymentId(),
+                    invoice.getId());
         } catch (RuntimeException exception) {
-            log.error("failed to process mercado pago webhook", exception);
+            log.error(
+                    "failed to process mercado pago webhook eventRecordId={} eventId={} eventType={} paymentId={} error={}",
+                    event.getId(),
+                    event.getEventId(),
+                    event.getEventType(),
+                    event.getGatewayPaymentId(),
+                    exception.getMessage(),
+                    exception);
             event.setErrorMessage(exception.getMessage());
             webhookEventRepository.save(event);
         }

@@ -11,11 +11,15 @@ import com.doistech.billingservice.shared.BusinessRuleException;
 import com.doistech.billingservice.shared.NotFoundException;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChargeService {
+
+    private static final Logger log = LoggerFactory.getLogger(ChargeService.class);
 
     private final ChargeRepository chargeRepository;
     private final InvoiceRepository invoiceRepository;
@@ -33,6 +37,7 @@ public class ChargeService {
 
     @Transactional
     public Charge create(CreateChargeRequest request) {
+        log.info("creating charge request invoiceId={} gateway={}", request.invoiceId(), request.gateway());
         if (request.gateway() != Gateway.MERCADO_PAGO) {
             throw new BusinessRuleException("unsupported payment gateway");
         }
@@ -64,7 +69,15 @@ public class ChargeService {
 
         invoice.setStatus(InvoiceStatus.WAITING_PAYMENT);
         invoiceRepository.save(invoice);
-        return chargeRepository.save(charge);
+        Charge savedCharge = chargeRepository.save(charge);
+        log.info(
+                "charge created successfully chargeId={} invoiceId={} gateway={} preferenceId={} status={}",
+                savedCharge.getId(),
+                invoice.getId(),
+                savedCharge.getGateway(),
+                savedCharge.getGatewayPreferenceId(),
+                savedCharge.getStatus());
+        return savedCharge;
     }
 
     @Transactional(readOnly = true)

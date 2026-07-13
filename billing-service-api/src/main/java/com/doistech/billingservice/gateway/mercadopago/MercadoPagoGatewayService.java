@@ -38,6 +38,12 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
     @Override
     public ChargeGatewayResponse createCharge(Invoice invoice) {
         ensureConfigured();
+        log.info(
+                "creating mercado pago charge for invoiceId={} sourceSystem={} externalReference={} amount={}",
+                invoice.getId(),
+                invoice.getSourceSystem(),
+                invoice.getExternalReference(),
+                invoice.getTotalAmount());
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("external_reference", buildExternalReference(invoice));
@@ -59,6 +65,13 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
             throw new GatewayIntegrationException("mercado pago did not return preference id or payment url");
         }
 
+        log.info(
+                "mercado pago charge created for invoiceId={} preferenceId={} paymentUrlPresent={} notificationUrl={}",
+                invoice.getId(),
+                preferenceId,
+                StringUtils.hasText(paymentUrl),
+                properties.notificationUrl());
+
         return new ChargeGatewayResponse(
                 Gateway.MERCADO_PAGO,
                 preferenceId,
@@ -72,18 +85,23 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
     public GatewayPaymentResponse getPayment(String gatewayPaymentId) {
         ensureConfigured();
         try {
+            log.info("looking up mercado pago payment paymentId={}", gatewayPaymentId);
             JsonNode response = restClient.get()
                     .uri("/v1/payments/{id}", gatewayPaymentId)
                     .headers(headers -> headers.setBearerAuth(properties.accessToken()))
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, rawResponse) -> {
-                        throw new GatewayIntegrationException("mercado pago payment lookup failed");
-                    })
                     .body(JsonNode.class);
 
             if (response == null) {
                 throw new GatewayIntegrationException("mercado pago returned empty payment response");
             }
+
+            log.info(
+                    "mercado pago payment lookup succeeded paymentId={} status={} externalReference={} approvedAt={}",
+                    response.path("id").asText(),
+                    response.path("status").asText(),
+                    response.path("external_reference").asText(null),
+                    response.path("date_approved").asText(null));
 
             return new GatewayPaymentResponse(
                     Gateway.MERCADO_PAGO,
@@ -95,7 +113,12 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
                     response
             );
         } catch (RestClientResponseException exception) {
-            log.error("mercado pago payment lookup failed: {}", exception.getResponseBodyAsString(), exception);
+            log.error(
+                    "mercado pago payment lookup failed paymentId={} statusCode={} responseBody={}",
+                    gatewayPaymentId,
+                    exception.getStatusCode(),
+                    sanitizeBody(exception.getResponseBodyAsString()),
+                    exception);
             throw new GatewayIntegrationException("mercado pago payment lookup failed", exception);
         }
     }
@@ -120,17 +143,20 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> post(String path, Map<String, Object> payload) {
         try {
+            log.info("sending mercado pago request path={} externalReference={}", path, payload.get("external_reference"));
             return restClient.post()
                     .uri(path)
                     .headers(headers -> headers.setBearerAuth(properties.accessToken()))
                     .body(payload)
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, rawResponse) -> {
-                        throw new GatewayIntegrationException("mercado pago charge creation failed");
-                    })
                     .body(Map.class);
         } catch (RestClientResponseException exception) {
-            log.error("mercado pago charge creation failed: {}", exception.getResponseBodyAsString(), exception);
+            log.error(
+                    "mercado pago charge creation failed path={} statusCode={} responseBody={}",
+                    path,
+                    exception.getStatusCode(),
+                    sanitizeBody(exception.getResponseBodyAsString()),
+                    exception);
             throw new GatewayIntegrationException("mercado pago charge creation failed", exception);
         }
     }
@@ -159,5 +185,12 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
             }
         }
         return null;
+    }
+
+    private String sanitizeBody(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "<empty>";
+        }
+        return value.length() > 1000 ? value.substring(0, 1000) + "...(truncated)" : value;
     }
 }
