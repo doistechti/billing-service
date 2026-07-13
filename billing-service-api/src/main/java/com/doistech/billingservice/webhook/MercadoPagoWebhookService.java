@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -94,31 +95,14 @@ public class MercadoPagoWebhookService {
             Charge charge = chargeRepository.findFirstByInvoiceIdOrderByCreatedAtDesc(invoice.getId())
                     .orElseThrow(() -> new BusinessRuleException("charge not found for invoice"));
 
-            if (!paymentRepository.existsByGatewayAndGatewayPaymentId(Gateway.MERCADO_PAGO, paymentResponse.gatewayPaymentId())) {
-                Payment payment = new Payment();
-                payment.setInvoice(invoice);
-                payment.setCharge(charge);
-                payment.setGateway(Gateway.MERCADO_PAGO);
-                payment.setGatewayPaymentId(paymentResponse.gatewayPaymentId());
-                payment.setGatewayStatus(paymentResponse.gatewayStatus());
-                payment.setAmount(paymentResponse.amount());
-                payment.setPaidAt(paymentResponse.paidAt());
-                payment.setRawResponse(paymentResponse.rawResponse());
-                paymentRepository.save(payment);
-                log.info(
-                        "payment created from webhook eventRecordId={} paymentId={} invoiceId={} chargeId={} amount={} gatewayStatus={}",
-                        event.getId(),
-                        paymentResponse.gatewayPaymentId(),
-                        invoice.getId(),
-                        charge.getId(),
-                        paymentResponse.amount(),
-                        paymentResponse.gatewayStatus());
-            } else {
+            if (paymentRepository.existsByGatewayAndGatewayPaymentId(Gateway.MERCADO_PAGO, paymentResponse.gatewayPaymentId())) {
                 log.info(
                         "payment already exists for webhook eventRecordId={} paymentId={} invoiceId={}",
                         event.getId(),
                         paymentResponse.gatewayPaymentId(),
                         invoice.getId());
+            } else {
+                savePaymentIdempotently(event, paymentResponse, invoice, charge);
             }
 
             charge.setGatewayPaymentId(paymentResponse.gatewayPaymentId());
@@ -179,6 +163,44 @@ public class MercadoPagoWebhookService {
 
         return invoiceRepository.findDetailedById(invoiceId)
                 .orElseThrow(() -> new BusinessRuleException("invoice not found"));
+    }
+
+    private void savePaymentIdempotently(
+            WebhookEvent event,
+            GatewayPaymentResponse paymentResponse,
+            Invoice invoice,
+            Charge charge
+    ) {
+        Payment payment = new Payment();
+        payment.setInvoice(invoice);
+        payment.setCharge(charge);
+        payment.setGateway(Gateway.MERCADO_PAGO);
+        payment.setGatewayPaymentId(paymentResponse.gatewayPaymentId());
+        payment.setGatewayStatus(paymentResponse.gatewayStatus());
+        payment.setAmount(paymentResponse.amount());
+        payment.setPaidAt(paymentResponse.paidAt());
+        payment.setRawResponse(paymentResponse.rawResponse());
+
+        try {
+            paymentRepository.save(payment);
+            log.info(
+                    "payment created from webhook eventRecordId={} paymentId={} invoiceId={} chargeId={} amount={} gatewayStatus={}",
+                    event.getId(),
+                    paymentResponse.gatewayPaymentId(),
+                    invoice.getId(),
+                    charge.getId(),
+                    paymentResponse.amount(),
+                    paymentResponse.gatewayStatus());
+        } catch (DataIntegrityViolationException exception) {
+            log.info(
+                    "payment creation raced with another webhook eventRecordId={} paymentId={} invoiceId={} message={}",
+                    event.getId(),
+                    paymentResponse.gatewayPaymentId(),
+                    invoice.getId(),
+                    exception.getMostSpecificCause() != null
+                            ? exception.getMostSpecificCause().getMessage()
+                            : exception.getMessage());
+        }
     }
 
     private UUID parseInvoiceId(String externalReference) {
