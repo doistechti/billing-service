@@ -12,6 +12,7 @@ import com.doistech.billingservice.core.payment.PaymentRepository;
 import com.doistech.billingservice.gateway.mercadopago.GatewayPaymentResponse;
 import com.doistech.billingservice.gateway.mercadopago.PaymentGatewayService;
 import com.doistech.billingservice.shared.BusinessRuleException;
+import com.doistech.billingservice.shared.GatewayIntegrationException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -19,9 +20,11 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class MercadoPagoWebhookService {
@@ -137,6 +140,18 @@ public class MercadoPagoWebhookService {
                     paymentResponse.gatewayPaymentId(),
                     invoice.getId());
         } catch (RuntimeException exception) {
+            if (isPaymentNotFound(exception)) {
+                log.warn(
+                        "mercado pago webhook received unknown payment eventRecordId={} eventId={} eventType={} paymentId={} error={}",
+                        event.getId(),
+                        event.getEventId(),
+                        event.getEventType(),
+                        event.getGatewayPaymentId(),
+                        exception.getMessage());
+                event.setErrorMessage(exception.getMessage());
+                webhookEventRepository.save(event);
+                return;
+            }
             log.error(
                     "failed to process mercado pago webhook eventRecordId={} eventId={} eventType={} paymentId={} error={}",
                     event.getId(),
@@ -148,6 +163,15 @@ public class MercadoPagoWebhookService {
             event.setErrorMessage(exception.getMessage());
             webhookEventRepository.save(event);
         }
+    }
+
+    private boolean isPaymentNotFound(RuntimeException exception) {
+        if (!(exception instanceof GatewayIntegrationException gatewayException)) {
+            return false;
+        }
+        Throwable cause = gatewayException.getCause();
+        return cause instanceof RestClientResponseException responseException
+                && responseException.getStatusCode() == HttpStatus.NOT_FOUND;
     }
 
     private Invoice resolveInvoice(GatewayPaymentResponse paymentResponse) {
