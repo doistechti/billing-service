@@ -9,6 +9,7 @@
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/ApiSecurityProperties.java
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/CorsProperties.java
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/MercadoPagoProperties.java
+/Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/OpenApiConfig.java
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/RestClientConfig.java
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/config/WebCorsConfig.java
 /Users/doistechti/Projetos/DOISTECH/billing-service/billing-service-api/src/main/java/com/doistech/billingservice/core/charge/Charge.java

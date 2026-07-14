@@ -1,2 +1,3 @@
 com/doistech/billingservice/config/CorsProperties.class
 com/doistech/billingservice/config/WebCorsConfig.class
+com/doistech/billingservice/config/OpenApiConfig.class
