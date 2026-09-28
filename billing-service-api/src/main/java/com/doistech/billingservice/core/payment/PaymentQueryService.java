@@ -16,13 +16,13 @@ public class PaymentQueryService {
     }
 
     @Transactional(readOnly = true)
-    public Payment getById(UUID id) {
-        return paymentRepository.findById(id)
+    public Payment getById(UUID merchantId, UUID id) {
+        return paymentRepository.findByIdAndMerchantId(id, merchantId)
                 .orElseThrow(() -> new NotFoundException("payment not found"));
     }
 
     @Transactional(readOnly = true)
-    public List<Payment> listByInvoice(UUID invoiceId) {
-        return paymentRepository.findByInvoiceIdOrderByCreatedAtDesc(invoiceId);
+    public List<Payment> listByInvoice(UUID merchantId, UUID invoiceId) {
+        return paymentRepository.findByInvoiceIdAndMerchantIdOrderByCreatedAtDesc(invoiceId, merchantId);
     }
 }

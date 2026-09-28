@@ -7,10 +7,10 @@ import com.doistech.billingservice.api.BillingApi.CreateChargeRequest;
 import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.invoice.InvoiceRepository;
 import com.doistech.billingservice.core.invoice.InvoiceStatus;
+import com.doistech.billingservice.core.merchant.MerchantService;
 import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.gateway.mercadopago.PaymentGatewayService;
 import com.doistech.billingservice.shared.BusinessRuleException;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -32,8 +32,16 @@ class ChargeServiceTest {
     @Mock
     private PaymentGatewayService paymentGatewayService;
 
+    @Mock
+    private MerchantService merchantService;
+
+    @Mock
+    private ChargeStatusSynchronizer synchronizer;
+
     @InjectMocks
     private ChargeService chargeService;
+
+    private static final UUID MERCHANT_ID = UUID.randomUUID();
 
     @Test
     void shouldRejectChargeCreationForPaidInvoice() {
@@ -42,10 +50,10 @@ class ChargeServiceTest {
         ReflectionTestUtils.setField(invoice, "id", invoiceId);
         invoice.setStatus(InvoiceStatus.PAID);
 
-        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findByIdAndMerchantId(invoiceId, MERCHANT_ID)).thenReturn(Optional.of(invoice));
 
         assertThrows(BusinessRuleException.class, () -> chargeService.create(
-                new CreateChargeRequest(invoiceId, Gateway.MERCADO_PAGO)));
+                MERCHANT_ID, new CreateChargeRequest(invoiceId, Gateway.MERCADO_PAGO), null));
     }
 
     @Test
@@ -55,11 +63,11 @@ class ChargeServiceTest {
         ReflectionTestUtils.setField(invoice, "id", invoiceId);
         invoice.setStatus(InvoiceStatus.OPEN);
 
-        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
-        when(chargeRepository.existsByInvoiceIdAndStatusIn(invoiceId, List.of(ChargeStatus.CREATED, ChargeStatus.WAITING_PAYMENT)))
+        when(invoiceRepository.findByIdAndMerchantId(invoiceId, MERCHANT_ID)).thenReturn(Optional.of(invoice));
+        when(chargeRepository.existsByInvoiceIdAndStatusIn(invoiceId, ChargeStatus.ACTIVE))
                 .thenReturn(true);
 
         assertThrows(BusinessRuleException.class, () -> chargeService.create(
-                new CreateChargeRequest(invoiceId, Gateway.MERCADO_PAGO)));
+                MERCHANT_ID, new CreateChargeRequest(invoiceId, Gateway.MERCADO_PAGO), null));
     }
 }

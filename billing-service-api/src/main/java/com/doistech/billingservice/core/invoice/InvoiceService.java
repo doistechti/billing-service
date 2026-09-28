@@ -5,6 +5,7 @@ import com.doistech.billingservice.api.BillingApi.CreateInvoiceRequest;
 import com.doistech.billingservice.core.customer.Customer;
 import com.doistech.billingservice.core.customer.CustomerRepository;
 import com.doistech.billingservice.shared.BusinessRuleException;
+import com.doistech.billingservice.shared.ConflictException;
 import com.doistech.billingservice.shared.NotFoundException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -25,13 +26,18 @@ public class InvoiceService {
     }
 
     @Transactional
-    public Invoice create(CreateInvoiceRequest request) {
+    public Invoice create(UUID merchantId, CreateInvoiceRequest request) {
         if (request.items() == null || request.items().isEmpty()) {
             throw new BusinessRuleException("invoice must contain at least one item");
         }
 
-        Customer customer = customerRepository.findById(request.customerId())
+        Customer customer = customerRepository.findByIdAndMerchantId(request.customerId(), merchantId)
                 .orElseThrow(() -> new NotFoundException("customer not found"));
+
+        if (invoiceRepository.existsByMerchantIdAndSourceSystemAndExternalReference(
+                merchantId, request.sourceSystem(), request.externalReference())) {
+            throw new ConflictException("invoice already exists for sourceSystem and externalReference");
+        }
 
         List<InvoiceItem> items = request.items().stream()
                 .map(this::toItem)
@@ -46,6 +52,7 @@ public class InvoiceService {
         }
 
         Invoice invoice = new Invoice();
+        invoice.setMerchantId(merchantId);
         invoice.setCustomer(customer);
         invoice.setSourceSystem(request.sourceSystem());
         invoice.setExternalReference(request.externalReference());
@@ -58,21 +65,21 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public Invoice getById(UUID id) {
-        return invoiceRepository.findDetailedById(id)
+    public Invoice getById(UUID merchantId, UUID id) {
+        return invoiceRepository.findByIdAndMerchantId(id, merchantId)
                 .orElseThrow(() -> new NotFoundException("invoice not found"));
     }
 
     @Transactional(readOnly = true)
-    public Invoice getByReference(String sourceSystem, String externalReference) {
-        return invoiceRepository.findBySourceSystemAndExternalReference(sourceSystem, externalReference)
+    public Invoice getByReference(UUID merchantId, String sourceSystem, String externalReference) {
+        return invoiceRepository.findByMerchantIdAndSourceSystemAndExternalReference(merchantId, sourceSystem, externalReference)
                 .orElseThrow(() -> new NotFoundException("invoice not found"));
     }
 
     @Transactional
-    public Invoice cancel(UUID id) {
-        Invoice invoice = getById(id);
-        if (invoice.getStatus() == InvoiceStatus.PAID) {
+    public Invoice cancel(UUID merchantId, UUID id) {
+        Invoice invoice = getById(merchantId, id);
+        if (invoice.getStatus() == InvoiceStatus.PAID || invoice.getStatus() == InvoiceStatus.REFUNDED) {
             throw new BusinessRuleException("paid invoice cannot be canceled");
         }
         if (invoice.getStatus() == InvoiceStatus.CANCELED) {

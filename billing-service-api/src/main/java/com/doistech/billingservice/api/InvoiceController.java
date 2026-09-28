@@ -5,6 +5,7 @@ import com.doistech.billingservice.api.BillingApi.InvoiceItemResponse;
 import com.doistech.billingservice.api.BillingApi.InvoiceResponse;
 import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.invoice.InvoiceService;
+import com.doistech.billingservice.core.merchant.AuthenticatedMerchant;
 import com.doistech.billingservice.shared.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,8 +51,8 @@ public class InvoiceController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
             @ApiResponse(responseCode = "401", description = "API key invalida ou ausente.")
     })
-    public InvoiceResponse create(@Valid @RequestBody CreateInvoiceRequest request) {
-        return toResponse(invoiceService.create(request));
+    public InvoiceResponse create(@AuthenticationPrincipal AuthenticatedMerchant merchant, @Valid @RequestBody CreateInvoiceRequest request) {
+        return toResponse(invoiceService.create(merchant.id(), request));
     }
 
     @GetMapping("/{id}")
@@ -63,9 +65,10 @@ public class InvoiceController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public InvoiceResponse getById(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Identificador interno da fatura.", example = "3a0c2c30-4c90-44d3-9621-1bd20ce4bc9c")
             @PathVariable UUID id) {
-        return toResponse(invoiceService.getById(id));
+        return toResponse(invoiceService.getById(merchant.id(), id));
     }
 
     @GetMapping("/by-reference")
@@ -79,12 +82,13 @@ public class InvoiceController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public InvoiceResponse getByReference(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Sistema de origem da fatura.", example = "erp")
             @RequestParam String sourceSystem,
             @Parameter(description = "Referencia externa da fatura no sistema de origem.", example = "invoice-2026-0001")
             @RequestParam String externalReference
     ) {
-        return toResponse(invoiceService.getByReference(sourceSystem, externalReference));
+        return toResponse(invoiceService.getByReference(merchant.id(), sourceSystem, externalReference));
     }
 
     @PatchMapping("/{id}/cancel")
@@ -99,9 +103,10 @@ public class InvoiceController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public InvoiceResponse cancel(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Identificador interno da fatura.", example = "3a0c2c30-4c90-44d3-9621-1bd20ce4bc9c")
             @PathVariable UUID id) {
-        return toResponse(invoiceService.cancel(id));
+        return toResponse(invoiceService.cancel(merchant.id(), id));
     }
 
     private InvoiceResponse toResponse(Invoice invoice) {

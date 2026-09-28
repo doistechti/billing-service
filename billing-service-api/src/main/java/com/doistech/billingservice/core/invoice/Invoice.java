@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +22,9 @@ import java.util.List;
 @Entity
 @Table(name = "invoices")
 public class Invoice extends BaseEntity {
+
+    @Column(name = "merchant_id", nullable = false)
+    private UUID merchantId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
@@ -140,5 +144,13 @@ public class Invoice extends BaseEntity {
 
     public List<InvoiceItem> getItems() {
         return items;
+    }
+
+    public UUID getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(UUID merchantId) {
+        this.merchantId = merchantId;
     }
 }

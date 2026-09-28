@@ -39,11 +39,27 @@ app:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://billing-service-billing-service-portal.moftjl.easypanel.host,http://localhost:4173,http://127.0.0.1:4173}
   security:
     api-key-header: X-API-Key
-    api-key: ${INTERNAL_API_KEY:0ebb5a27ce2dcbd886d49fec60f8bc99}
+    # Chave do merchant legacy (sistemas clientes anteriores). Sem valor, o merchant legacy fica sem acesso por API key.
+    api-key: ${INTERNAL_API_KEY:}
+    admin-api-key-header: X-Admin-Key
+    # Habilita /api/admin/merchants. Sem valor, a administração fica desabilitada.
+    admin-api-key: ${ADMIN_API_KEY:}
+    # 32 bytes em Base64 para cifrar credenciais dos merchants (openssl rand -base64 32). Obrigatória.
+    encryption-key: ${BILLING_ENCRYPTION_KEY:}
+  callbacks:
+    enabled: ${CALLBACKS_ENABLED:true}
+    poll-interval: ${CALLBACKS_POLL_INTERVAL:PT10S}
+    max-attempts: ${CALLBACKS_MAX_ATTEMPTS:8}
+    batch-size: ${CALLBACKS_BATCH_SIZE:20}
+    initial-backoff: ${CALLBACKS_INITIAL_BACKOFF:PT30S}
+    timeout: ${CALLBACKS_TIMEOUT:PT10S}
 
 mercado-pago:
   base-url: ${MERCADO_PAGO_BASE_URL:https://api.mercadopago.com}
-  access-token: ${MERCADO_PAGO_ACCESS_TOKEN:APP_USR-2169667340333844-070914-b0d074191686a4c213d60cd5048b727d-3313854838}
-  public-key: ${MERCADO_PAGO_PUBLIC_KEY:APP_USR-dd97f0c7-e6be-4a5d-9ba6-ae726620b0f6}
-  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:43bbfd800b697bfb3ae9742f999906656bd1eda75a9be9c3b5f94c283798aeaa}
+  # Credenciais do merchant legacy. Os demais merchants guardam as próprias credenciais no banco.
+  access-token: ${MERCADO_PAGO_ACCESS_TOKEN:}
+  public-key: ${MERCADO_PAGO_PUBLIC_KEY:}
+  webhook-secret: ${MERCADO_PAGO_WEBHOOK_SECRET:}
+  sandbox: ${MERCADO_PAGO_SANDBOX:false}
+  webhook-base-url: ${APP_BASE_URL:http://localhost:8080}
   notification-url: ${APP_BASE_URL:http://localhost:8080}/api/webhooks/mercado-pago

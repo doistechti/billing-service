@@ -35,6 +35,16 @@ public abstract class BaseEntity {
         updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * Define o id antes de persistir, quando ele precisa ser conhecido antecipadamente.
+     */
+    public void assignId(UUID id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id already assigned");
+        }
+        this.id = id;
+    }
+
     public UUID getId() {
         return id;
     }

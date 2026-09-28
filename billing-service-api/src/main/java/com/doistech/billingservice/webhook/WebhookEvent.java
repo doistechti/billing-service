@@ -21,6 +21,9 @@ public class WebhookEvent {
     @Id
     private UUID id;
 
+    @Column(name = "merchant_id")
+    private UUID merchantId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private Gateway gateway;
@@ -126,5 +129,13 @@ public class WebhookEvent {
 
     public void setProcessedAt(LocalDateTime processedAt) {
         this.processedAt = processedAt;
+    }
+
+    public UUID getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(UUID merchantId) {
+        this.merchantId = merchantId;
     }
 }

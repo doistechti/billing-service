@@ -6,5 +6,6 @@ public enum InvoiceStatus {
     WAITING_PAYMENT,
     PAID,
     OVERDUE,
-    CANCELED
+    CANCELED,
+    REFUNDED
 }

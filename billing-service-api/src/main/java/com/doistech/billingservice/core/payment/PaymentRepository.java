@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
-    List<Payment> findByInvoiceIdOrderByCreatedAtDesc(UUID invoiceId);
+    Optional<Payment> findByIdAndMerchantId(UUID id, UUID merchantId);
+
+    List<Payment> findByInvoiceIdAndMerchantIdOrderByCreatedAtDesc(UUID invoiceId, UUID merchantId);
 
     Optional<Payment> findByGatewayAndGatewayPaymentId(Gateway gateway, String gatewayPaymentId);
 

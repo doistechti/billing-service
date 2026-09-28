@@ -4,10 +4,14 @@ import com.doistech.billingservice.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.util.UUID;
 
 @Entity
 @Table(name = "customers")
 public class Customer extends BaseEntity {
+
+    @Column(name = "merchant_id", nullable = false)
+    private UUID merchantId;
 
     @Column(name = "source_system", nullable = false, length = 100)
     private String sourceSystem;
@@ -84,5 +88,13 @@ public class Customer extends BaseEntity {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public UUID getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(UUID merchantId) {
+        this.merchantId = merchantId;
     }
 }

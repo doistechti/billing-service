@@ -1,6 +1,7 @@
 package com.doistech.billingservice.core.customer;
 
 import com.doistech.billingservice.api.BillingApi.CreateCustomerRequest;
+import com.doistech.billingservice.shared.ConflictException;
 import com.doistech.billingservice.shared.NotFoundException;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -16,8 +17,13 @@ public class CustomerService {
     }
 
     @Transactional
-    public Customer create(CreateCustomerRequest request) {
+    public Customer create(UUID merchantId, CreateCustomerRequest request) {
+        if (customerRepository.existsByMerchantIdAndSourceSystemAndExternalReference(
+                merchantId, request.sourceSystem(), request.externalReference())) {
+            throw new ConflictException("customer already exists for sourceSystem and externalReference");
+        }
         Customer customer = new Customer();
+        customer.setMerchantId(merchantId);
         customer.setSourceSystem(request.sourceSystem());
         customer.setExternalReference(request.externalReference());
         customer.setName(request.name());
@@ -29,8 +35,14 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public Customer getById(UUID id) {
-        return customerRepository.findById(id)
+    public Customer getById(UUID merchantId, UUID id) {
+        return customerRepository.findByIdAndMerchantId(id, merchantId)
+                .orElseThrow(() -> new NotFoundException("customer not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public Customer getByReference(UUID merchantId, String sourceSystem, String externalReference) {
+        return customerRepository.findByMerchantIdAndSourceSystemAndExternalReference(merchantId, sourceSystem, externalReference)
                 .orElseThrow(() -> new NotFoundException("customer not found"));
     }
 }

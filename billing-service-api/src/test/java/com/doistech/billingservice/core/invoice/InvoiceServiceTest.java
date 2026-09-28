@@ -34,16 +34,18 @@ class InvoiceServiceTest {
     @InjectMocks
     private InvoiceService invoiceService;
 
+    private static final UUID MERCHANT_ID = UUID.randomUUID();
+
     @Test
     void shouldCalculateInvoiceTotalFromItems() {
         UUID customerId = UUID.randomUUID();
         Customer customer = new Customer();
         customer.setName("Joao");
 
-        when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+        when(customerRepository.findByIdAndMerchantId(customerId, MERCHANT_ID)).thenReturn(Optional.of(customer));
         when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Invoice invoice = invoiceService.create(new CreateInvoiceRequest(
+        Invoice invoice = invoiceService.create(MERCHANT_ID, new CreateInvoiceRequest(
                 customerId,
                 "MATER_ECCLESIAE",
                 "ALUNO-123-MENSALIDADE-2026-07",
@@ -57,6 +59,7 @@ class InvoiceServiceTest {
         assertEquals(new BigDecimal("155.00"), invoice.getTotalAmount());
         assertEquals(InvoiceStatus.OPEN, invoice.getStatus());
         assertEquals(2, invoice.getItems().size());
+        assertEquals(MERCHANT_ID, invoice.getMerchantId());
     }
 
     @Test
@@ -69,7 +72,7 @@ class InvoiceServiceTest {
                 LocalDate.of(2026, 7, 15),
                 List.of());
 
-        assertThrows(BusinessRuleException.class, () -> invoiceService.create(request));
+        assertThrows(BusinessRuleException.class, () -> invoiceService.create(MERCHANT_ID, request));
     }
 
     @Test
@@ -79,8 +82,8 @@ class InvoiceServiceTest {
         ReflectionTestUtils.setField(invoice, "id", invoiceId);
         invoice.setStatus(InvoiceStatus.PAID);
 
-        when(invoiceRepository.findDetailedById(invoiceId)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findByIdAndMerchantId(invoiceId, MERCHANT_ID)).thenReturn(Optional.of(invoice));
 
-        assertThrows(BusinessRuleException.class, () -> invoiceService.cancel(invoiceId));
+        assertThrows(BusinessRuleException.class, () -> invoiceService.cancel(MERCHANT_ID, invoiceId));
     }
 }

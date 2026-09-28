@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
         info = @Info(
                 title = "Billing Service API",
                 version = "v1",
-                description = "API para cadastro de clientes, emissao de faturas, geracao de cobrancas, consulta de pagamentos e recebimento de webhooks.",
+                description = "API multi-merchant para clientes, faturas, cobrancas (Checkout Pro, Pix, cartao e boleto), estornos, webhooks do Mercado Pago e callbacks assinados.",
                 contact = @Contact(name = "DOISTECH"),
                 license = @License(name = "Proprietary")
         )
@@ -25,6 +25,13 @@ import org.springframework.context.annotation.Configuration;
         in = SecuritySchemeIn.HEADER,
         paramName = "X-API-Key",
         description = "Chave de autenticacao exigida nos endpoints protegidos."
+)
+@SecurityScheme(
+        name = "adminKeyAuth",
+        type = SecuritySchemeType.APIKEY,
+        in = SecuritySchemeIn.HEADER,
+        paramName = "X-Admin-Key",
+        description = "Chave de administracao (ADMIN_API_KEY) para cadastro de merchants."
 )
 public class OpenApiConfig {
 }

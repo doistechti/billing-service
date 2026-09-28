@@ -1,5 +1,6 @@
 package com.doistech.billingservice.api;
 
+import com.doistech.billingservice.core.charge.ChargeMethod;
 import com.doistech.billingservice.core.charge.ChargeStatus;
 import com.doistech.billingservice.core.invoice.InvoiceStatus;
 import com.doistech.billingservice.core.payment.Gateway;
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -51,6 +53,10 @@ public final class BillingApi {
             String name,
             @Schema(description = "E-mail do cliente.", example = "maria@empresa.com")
             String email,
+            @Schema(description = "Documento do cliente.", nullable = true)
+            String document,
+            @Schema(description = "Telefone do cliente.", nullable = true)
+            String phone,
             @Schema(description = "Indica se o cliente está ativo.", example = "true")
             boolean active
     ) {
@@ -133,7 +139,67 @@ public final class BillingApi {
             @Schema(description = "Identificador da fatura a ser cobrada.", example = "3a0c2c30-4c90-44d3-9621-1bd20ce4bc9c")
             @NotNull(message = "invoiceId is required") UUID invoiceId,
             @Schema(description = "Gateway de pagamento a ser usado.")
-            @NotNull(message = "gateway is required") Gateway gateway
+            @NotNull(message = "gateway is required") Gateway gateway,
+            @Schema(description = "Forma de pagamento. Sem valor, gera Checkout Pro (paymentUrl).", nullable = true)
+            ChargeMethod method,
+            @Schema(description = "Dados do pagador. Obrigatório para PIX, CREDIT_CARD e BOLETO.", nullable = true)
+            @Valid PayerRequest payer,
+            @Schema(description = "Cartão tokenizado no navegador. Obrigatório para CREDIT_CARD.", nullable = true)
+            @Valid CardRequest card,
+            @Schema(description = "Validade em minutos para PIX (padrão 30) e BOLETO (padrão 3 dias).", example = "30", nullable = true)
+            @Positive(message = "expiresInMinutes must be positive") Integer expiresInMinutes
+    ) {
+
+        public CreateChargeRequest(UUID invoiceId, Gateway gateway) {
+            this(invoiceId, gateway, null, null, null, null);
+        }
+
+        public ChargeMethod methodOrDefault() {
+            return method == null ? ChargeMethod.CHECKOUT_PRO : method;
+        }
+    }
+
+    @Schema(name = "PayerRequest", description = "Pagador da cobrança. Campos ausentes usam os dados do customer.")
+    public record PayerRequest(
+            @Schema(description = "Nome completo.", example = "Pedro Almeida", nullable = true) String name,
+            @Schema(description = "E-mail.", example = "pedro@email.com", nullable = true)
+            @Email(message = "payer email must be valid") String email,
+            @Schema(description = "CPF ou CNPJ, apenas dígitos.", example = "12345678909", nullable = true)
+            @Pattern(regexp = "\\d{11}|\\d{14}", message = "payer document must have 11 or 14 digits") String document,
+            @Schema(description = "Endereço. Obrigatório para BOLETO.", nullable = true)
+            @Valid AddressRequest address
+    ) {
+    }
+
+    @Schema(name = "AddressRequest", description = "Endereço do pagador.")
+    public record AddressRequest(
+            @NotBlank(message = "address zipCode is required") @Pattern(regexp = "\\d{8}", message = "address zipCode must have 8 digits") String zipCode,
+            @NotBlank(message = "address street is required") String street,
+            @NotBlank(message = "address number is required") String number,
+            @NotBlank(message = "address neighborhood is required") String neighborhood,
+            @NotBlank(message = "address city is required") String city,
+            @NotBlank(message = "address state is required") @Pattern(regexp = "[A-Z]{2}", message = "address state must be a 2-letter UF") String state
+    ) {
+    }
+
+    @Schema(name = "CardRequest", description = "Cartão tokenizado pelo MP.js com a public key do merchant.")
+    public record CardRequest(
+            @Schema(description = "Token do cartão (uso único).") @NotBlank(message = "card token is required") String token,
+            @Schema(description = "Bandeira retornada pelo MP.js.", example = "visa") @NotBlank(message = "card paymentMethodId is required") String paymentMethodId,
+            @Schema(description = "Emissor retornado pelo MP.js.", nullable = true) String issuerId,
+            @Schema(description = "Número de parcelas.", example = "10") @Positive(message = "card installments must be positive") Integer installments
+    ) {
+
+        @Override
+        public String toString() {
+            return "CardRequest[paymentMethodId=%s, installments=%s]".formatted(paymentMethodId, installments);
+        }
+    }
+
+    @Schema(name = "RefundChargeRequest", description = "Estorno de uma cobrança paga.")
+    public record RefundChargeRequest(
+            @Schema(description = "Valor a estornar. Sem valor, estorna o saldo total.", example = "50.00", nullable = true)
+            @Positive(message = "amount must be positive") BigDecimal amount
     ) {
     }
 
@@ -149,12 +215,46 @@ public final class BillingApi {
             String gatewayPreferenceId,
             @Schema(description = "Identificador do pagamento no gateway, quando existir.", example = "987654321")
             String gatewayPaymentId,
-            @Schema(description = "URL para o usuário concluir o pagamento.", example = "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123")
+            @Schema(description = "URL para o usuário concluir o pagamento (Checkout Pro).", example = "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=123")
             String paymentUrl,
             @Schema(description = "Status atual da cobrança.")
             ChargeStatus status,
             @Schema(description = "Valor da cobrança.", example = "199.90")
-            BigDecimal amount
+            BigDecimal amount,
+            @Schema(description = "Forma de pagamento.")
+            ChargeMethod method,
+            @Schema(description = "Detalhe do status no gateway (ex.: cc_rejected_insufficient_amount).", nullable = true)
+            String statusDetail,
+            @Schema(description = "Parcelas do cartão.", nullable = true)
+            Integer installments,
+            @Schema(description = "Dados do Pix, quando method = PIX.", nullable = true)
+            PixResponse pix,
+            @Schema(description = "Dados do boleto, quando method = BOLETO.", nullable = true)
+            BoletoResponse boleto,
+            @Schema(description = "Validade do Pix/boleto.", nullable = true)
+            LocalDateTime expiresAt,
+            @Schema(description = "Data/hora da aprovação.", nullable = true)
+            LocalDateTime paidAt,
+            @Schema(description = "Valor já estornado.", example = "0.00")
+            BigDecimal refundedAmount,
+            @Schema(description = "Criação da cobrança.")
+            LocalDateTime createdAt
+    ) {
+    }
+
+    @Schema(name = "PixResponse", description = "Dados para pagamento via Pix.")
+    public record PixResponse(
+            @Schema(description = "Código copia e cola.") String qrCode,
+            @Schema(description = "Imagem PNG do QR Code em Base64.") String qrCodeBase64,
+            @Schema(description = "Página do Mercado Pago com o QR Code.") String ticketUrl
+    ) {
+    }
+
+    @Schema(name = "BoletoResponse", description = "Dados para pagamento via boleto.")
+    public record BoletoResponse(
+            @Schema(description = "Código de barras.") String barcode,
+            @Schema(description = "Linha digitável.") String digitableLine,
+            @Schema(description = "URL do PDF do boleto.") String pdfUrl
     ) {
     }
 
@@ -185,5 +285,20 @@ public final class BillingApi {
 
     @Schema(name = "WebhookReceivedResponse", description = "Confirmação de recebimento do webhook.")
     public record WebhookReceivedResponse(String status) {
+    }
+
+    @Schema(name = "CallbackDeliveryResponse", description = "Callback enviado ou pendente para o sistema cliente.")
+    public record CallbackDeliveryResponse(
+            UUID id,
+            String eventType,
+            UUID chargeId,
+            String status,
+            int attempts,
+            LocalDateTime nextAttemptAt,
+            Integer lastStatusCode,
+            String lastError,
+            LocalDateTime deliveredAt,
+            LocalDateTime createdAt
+    ) {
     }
 }

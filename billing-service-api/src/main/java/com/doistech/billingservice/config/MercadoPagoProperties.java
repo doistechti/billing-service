@@ -8,6 +8,8 @@ public record MercadoPagoProperties(
         String accessToken,
         String publicKey,
         String webhookSecret,
-        String notificationUrl
+        String notificationUrl,
+        String webhookBaseUrl,
+        boolean sandbox
 ) {
 }

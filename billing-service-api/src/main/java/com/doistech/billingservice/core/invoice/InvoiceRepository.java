@@ -11,7 +11,14 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     Optional<Invoice> findById(UUID id);
 
     @EntityGraph(attributePaths = {"customer", "items"})
-    Optional<Invoice> findBySourceSystemAndExternalReference(String sourceSystem, String externalReference);
+    Optional<Invoice> findByIdAndMerchantId(UUID id, UUID merchantId);
+
+    @EntityGraph(attributePaths = {"customer", "items"})
+    Optional<Invoice> findByMerchantIdAndSourceSystemAndExternalReference(
+            UUID merchantId, String sourceSystem, String externalReference);
+
+    boolean existsByMerchantIdAndSourceSystemAndExternalReference(
+            UUID merchantId, String sourceSystem, String externalReference);
 
     default Optional<Invoice> findDetailedById(UUID id) {
         return findById(id);

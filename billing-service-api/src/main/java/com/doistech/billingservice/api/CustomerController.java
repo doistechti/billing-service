@@ -4,6 +4,7 @@ import com.doistech.billingservice.api.BillingApi.CreateCustomerRequest;
 import com.doistech.billingservice.api.BillingApi.CustomerResponse;
 import com.doistech.billingservice.core.customer.Customer;
 import com.doistech.billingservice.core.customer.CustomerService;
+import com.doistech.billingservice.core.merchant.AuthenticatedMerchant;
 import com.doistech.billingservice.shared.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,11 +17,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,10 +47,12 @@ public class CustomerController {
                     content = @Content(schema = @Schema(implementation = CustomerResponse.class))),
             @ApiResponse(responseCode = "400", description = "Payload invalido ou regra de negocio violada.",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "API key invalida ou ausente.")
+            @ApiResponse(responseCode = "401", description = "API key invalida ou ausente."),
+            @ApiResponse(responseCode = "409", description = "Cliente ja existe para sourceSystem + externalReference.",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public CustomerResponse create(@Valid @RequestBody CreateCustomerRequest request) {
-        return toResponse(customerService.create(request));
+    public CustomerResponse create(@AuthenticationPrincipal AuthenticatedMerchant merchant, @Valid @RequestBody CreateCustomerRequest request) {
+        return toResponse(customerService.create(merchant.id(), request));
     }
 
     @GetMapping("/{id}")
@@ -60,9 +65,27 @@ public class CustomerController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public CustomerResponse getById(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Identificador interno do cliente.", example = "8d56f5a6-fb5d-4d1c-a8f4-1831fd9f8d15")
             @PathVariable UUID id) {
-        return toResponse(customerService.getById(id));
+        return toResponse(customerService.getById(merchant.id(), id));
+    }
+
+    @GetMapping("/by-reference")
+    @Operation(summary = "Buscar cliente por referencia externa",
+            description = "Consulta um cliente usando a dupla sourceSystem + externalReference.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cliente encontrado.",
+                    content = @Content(schema = @Schema(implementation = CustomerResponse.class))),
+            @ApiResponse(responseCode = "401", description = "API key invalida ou ausente."),
+            @ApiResponse(responseCode = "404", description = "Cliente nao encontrado.",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public CustomerResponse getByReference(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
+            @RequestParam String sourceSystem,
+            @RequestParam String externalReference) {
+        return toResponse(customerService.getByReference(merchant.id(), sourceSystem, externalReference));
     }
 
     private CustomerResponse toResponse(Customer customer) {
@@ -72,6 +95,8 @@ public class CustomerController {
                 customer.getExternalReference(),
                 customer.getName(),
                 customer.getEmail(),
+                customer.getDocument(),
+                customer.getPhone(),
                 customer.isActive()
         );
     }

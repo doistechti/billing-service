@@ -3,6 +3,7 @@ package com.doistech.billingservice.api;
 import com.doistech.billingservice.api.BillingApi.PaymentResponse;
 import com.doistech.billingservice.core.payment.Payment;
 import com.doistech.billingservice.core.payment.PaymentQueryService;
+import com.doistech.billingservice.core.merchant.AuthenticatedMerchant;
 import com.doistech.billingservice.shared.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,9 +44,10 @@ public class PaymentController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public PaymentResponse getById(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Identificador interno do pagamento.", example = "65ca0d73-c3eb-4d3d-a93d-8f298c3d2c51")
             @PathVariable UUID id) {
-        return toResponse(paymentQueryService.getById(id));
+        return toResponse(paymentQueryService.getById(merchant.id(), id));
     }
 
     @GetMapping("/invoice/{invoiceId}")
@@ -55,9 +58,10 @@ public class PaymentController {
             @ApiResponse(responseCode = "401", description = "API key invalida ou ausente.")
     })
     public List<PaymentResponse> listByInvoice(
+            @AuthenticationPrincipal AuthenticatedMerchant merchant,
             @Parameter(description = "Identificador interno da fatura.", example = "3a0c2c30-4c90-44d3-9621-1bd20ce4bc9c")
             @PathVariable UUID invoiceId) {
-        return paymentQueryService.listByInvoice(invoiceId).stream().map(this::toResponse).toList();
+        return paymentQueryService.listByInvoice(merchant.id(), invoiceId).stream().map(this::toResponse).toList();
     }
 
     private PaymentResponse toResponse(Payment payment) {

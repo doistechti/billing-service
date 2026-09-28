@@ -95,14 +95,27 @@ DB_URL=jdbc:postgresql://localhost:5432/billing_service
 DB_USERNAME=postgres
 DB_PASSWORD=postgres
 
-INTERNAL_API_KEY=change-me
+# Obrigatória: cifra as credenciais dos merchants (openssl rand -base64 32)
+BILLING_ENCRYPTION_KEY=
+# Habilita /api/admin/merchants
+ADMIN_API_KEY=change-me-admin
 
+# Merchant legacy (sistemas clientes anteriores)
+INTERNAL_API_KEY=change-me
 MERCADO_PAGO_BASE_URL=https://api.mercadopago.com
 MERCADO_PAGO_ACCESS_TOKEN=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_PUBLIC_KEY=TEST-xxxxxxxxxxxxxxxx
 MERCADO_PAGO_WEBHOOK_SECRET=xxxxxxxxxxxxxxxx
+MERCADO_PAGO_SANDBOX=false
 APP_BASE_URL=http://localhost:8080
+
+# Callbacks aos sistemas clientes
+CALLBACKS_ENABLED=true
 ```
+
+Nenhum segredo tem valor padrão no `application.yml`. Sem `INTERNAL_API_KEY`, o merchant legacy fica sem acesso.
+`MERCADO_PAGO_SANDBOX=true` faz o Checkout Pro do merchant legacy usar `sandbox_init_point`; antes o serviço
+preferia a URL de sandbox sempre que o Mercado Pago a devolvia.
 
 A aplicacao tambem aceita `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD`.
 
@@ -131,6 +144,8 @@ Tabelas da POC:
 - `charges`
 - `payments`
 - `webhook_events`
+- `merchants` (V2)
+- `callback_deliveries` (V2, outbox de callbacks)
 
 ## Endpoints
 
@@ -138,8 +153,9 @@ Base path: `/api`
 
 ### Customers
 
-- `POST /customers`
+- `POST /customers` (409 se `sourceSystem + externalReference` já existir)
 - `GET /customers/{id}`
+- `GET /customers/by-reference`
 
 ### Invoices
 
@@ -150,9 +166,25 @@ Base path: `/api`
 
 ### Charges
 
-- `POST /charges`
+- `POST /charges` — `method`: `CHECKOUT_PRO` (padrão), `PIX`, `CREDIT_CARD`, `BOLETO`; header `Idempotency-Key`
 - `GET /charges/{id}`
 - `GET /charges/invoice/{invoiceId}`
+- `POST /charges/{id}/sync` — consulta o gateway
+- `POST /charges/{id}/cancel` — Pix/boleto/Checkout Pro pendente
+- `POST /charges/{id}/refund` — estorno total ou parcial
+
+### Merchant e callbacks
+
+- `GET /merchant` — configuração pública (public key do Mercado Pago)
+- `GET /callbacks?status=FAILED`
+- `POST /callbacks/{id}/redeliver`
+
+### Admin (header `X-Admin-Key`)
+
+- `POST /admin/merchants` — devolve `apiKey` e `callbackSecret` uma única vez
+- `GET /admin/merchants`, `GET /admin/merchants/{id}`, `PATCH /admin/merchants/{id}`
+- `POST /admin/merchants/{id}/rotate-api-key`
+- `POST /admin/merchants/{id}/rotate-callback-secret`
 
 ### Payments
 
@@ -161,7 +193,8 @@ Base path: `/api`
 
 ### Webhooks
 
-- `POST /webhooks/mercado-pago`
+- `POST /webhooks/mercado-pago/{merchantId}` — valida `x-signature` quando o merchant tem webhook secret
+- `POST /webhooks/mercado-pago` — merchant legacy
 
 ### Health
 
@@ -169,11 +202,15 @@ Base path: `/api`
 
 ## Autenticação
 
-Todos os endpoints internos exigem:
+Cada merchant (conta recebedora) tem a própria API key e as próprias credenciais Mercado Pago.
+Todos os endpoints internos exigem a API key do merchant, e cada merchant só enxerga os próprios registros:
 
 ```http
-X-API-Key: {INTERNAL_API_KEY}
+X-API-Key: {apiKey do merchant}
 ```
+
+A `INTERNAL_API_KEY` continua valendo como API key do merchant `legacy`. Detalhes em
+[`../billing-service-sdd/09-merchants-pagamento-direto-callbacks.md`](../billing-service-sdd/09-merchants-pagamento-direto-callbacks.md).
 
 Endpoints públicos na POC:
 
@@ -372,18 +409,19 @@ mvn spring-boot:run
 
 ## Testes
 
-Testes unitários adicionados:
-
-- regras de criação e cancelamento de invoice
-- bloqueio de charge inválida
-- processamento de webhook aprovado
-
-Execução esperada:
+- unitários: invoice, charge, sincronização de status, mapeamento de status do Mercado Pago, assinatura de
+  webhook e cifra de segredos;
+- integração (`MerchantPaymentsIntegrationTest`): Postgres via Testcontainers e Mercado Pago falso cobrindo
+  merchants, isolamento, Pix com idempotência, webhook assinado, callback assinado, cartão, boleto, estorno e o
+  merchant legacy com Checkout Pro.
 
 ```bash
-mvn test
+./mvnw test
 ```
 
-## Limitação atual do workspace
+Com Colima, aponte o Testcontainers para o socket:
 
-No estado atual deste workspace, o projeto não tem `mvnw` e o ambiente em que a implementação foi feita não tinha `mvn` instalado. A documentação acima assume um ambiente com Maven disponível.
+```bash
+DOCKER_HOST=unix://$HOME/.colima/default/docker.sock \
+TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw test
+```

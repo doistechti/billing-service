@@ -26,6 +26,9 @@ public class Payment {
     @Id
     private UUID id;
 
+    @Column(name = "merchant_id", nullable = false)
+    private UUID merchantId;
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "invoice_id", nullable = false)
     private Invoice invoice;
@@ -133,5 +136,13 @@ public class Payment {
 
     public void setRawResponse(JsonNode rawResponse) {
         this.rawResponse = rawResponse;
+    }
+
+    public UUID getMerchantId() {
+        return merchantId;
+    }
+
+    public void setMerchantId(UUID merchantId) {
+        this.merchantId = merchantId;
     }
 }
