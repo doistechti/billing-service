@@ -1,7 +1,8 @@
 # SDD 10 — Gateway Pagar.me e Multigateway
 
-> Status: **em planejamento** (branch `feature/gateway-pagar-me`). Este documento é a fonte única da mudança.
-> Atualize a tabela "Andamento" ao fim de cada passo.
+> Status: **implementado e testado contra servidor falso** (branch `feature/gateway-pagar-me`). **Não validado contra a
+> API real do Pagar.me**: ver Pendências de validação e o guia `billing-service-api/docs/pagar-me-development-setup.md`.
+> Este documento é a fonte única da mudança.
 
 ## Objetivo
 
@@ -200,7 +201,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants (49 testes verdes) | feito |
 | 8 | Teste de isolamento entre merchants de gateways diferentes (`merchantsOfDifferentGatewaysCannotReachEachOthersData`; validado por mutação: quebrar `getById` faz o teste falhar) (50 testes verdes) | feito |
 | 9 | Contrato da store reforçado no billing, incluindo o **callback assinado** (verificador independente do `CallbackSigner`; mesmo envelope para Mercado Pago e Pagar.me; validado por mutação) (52 testes verdes). **Não** roda a store contra o billing real: ver nota abaixo | feito (opção b) |
-| 10 | Roteiro de testes e `pagar-me-development-setup.md` | pendente |
+| 10 | Roteiro de testes e `pagar-me-development-setup.md` (inclui comando do Colima, fluxo de um curso, checklist de sandbox e checagem manual store ↔ billing) | feito |
 
 Critério para fechar cada passo: `./mvnw verify` verde e nenhum teste de contrato alterado.
 

@@ -620,3 +620,18 @@ Voce pode considerar a POC testada quando conseguir:
    - `DB_USERNAME`
    - `DB_PASSWORD`
    - logs do Flyway
+
+## Testes automatizados e Pagar.me
+
+Além do roteiro manual acima (que usa o Mercado Pago), a suíte automatizada cobre os dois gateways. Para rodar,
+veja o comando do Colima em [`pagar-me-development-setup.md`](pagar-me-development-setup.md#1-rodar-os-testes).
+
+| Classe | Cobre |
+|---|---|
+| `MerchantPaymentsIntegrationTest` | Mercado Pago ponta a ponta, contrato JSON e callback consumidos pela doistech-store |
+| `PagarMePaymentsIntegrationTest` | Merchant Pagar.me: Pix, webhook autenticado, autoatendimento, isolamento entre gateways, callback |
+| `PagarMeGatewayServiceTest` | Cliente Pagar.me contra servidor falso (centavos, Basic auth, erros, fuso) |
+| `PagarMeStatusMapperTest`, `PaymentGatewayRouterTest` | Mapa de status por gateway e roteamento |
+| `support/CallbackContract` | Verificador independente do callback, como a store o valida |
+
+Para testar o fluxo de um merchant Pagar.me à mão, siga as seções 3 a 5 do guia de setup do Pagar.me.

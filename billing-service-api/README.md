@@ -428,7 +428,8 @@ TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw test
 
 ## Gateways e documentação
 
-- Gateways suportados: Mercado Pago (padrão) e Pagar.me (em implementação, por merchant).
+- Gateways suportados: Mercado Pago (padrão) e Pagar.me (por merchant; ainda não validado contra a API real).
+- Setup, fluxo de um merchant e checklist de validação do Pagar.me: [`docs/pagar-me-development-setup.md`](docs/pagar-me-development-setup.md).
 - A mudança multigateway está documentada em [`../billing-service-sdd/10-integracao-pagar-me.md`](../billing-service-sdd/10-integracao-pagar-me.md),
   com a regra de compatibilidade com os sistemas clientes e o andamento por passo.
 - Os links absolutos acima para `/Users/doistechti/Projetos/DOISTECH/...` estão desatualizados; os arquivos
