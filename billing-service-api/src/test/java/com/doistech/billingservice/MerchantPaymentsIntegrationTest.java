@@ -227,6 +227,71 @@ class MerchantPaymentsIntegrationTest {
         assertThat(mercadoPago.lastAuthorization).isEqualTo("Bearer " + LEGACY_TOKEN);
     }
 
+    /**
+     * Contrato consumido pela doistech-store (BilinsBillingGateway). Só confere que os campos que a store lê
+     * continuam presentes com o mesmo tipo: campos novos são permitidos, remover ou renomear estes não é.
+     * Ver SDD 10 — regra de compatibilidade.
+     */
+    @Test
+    void storeConsumedJsonContractStaysStable() {
+        JsonNode created = createMerchant("store-contrato", STORE_TOKEN, null);
+        assertHasFields(created, "apiKey", "callbackSecret", "merchant");
+        assertHasFields(created.path("merchant"), "id", "code", "mercadoPagoNotificationUrl");
+        String apiKey = created.path("apiKey").asText();
+
+        JsonNode merchant = get("/api/merchant", apiKey).getBody();
+        assertHasFields(merchant, "id", "code", "mercadoPagoPublicKey", "mercadoPagoConfigured", "sandbox",
+                "webhookSignatureEnabled", "mercadoPagoNotificationUrl");
+        assertThat(merchant.path("mercadoPagoConfigured").isBoolean()).isTrue();
+        assertThat(merchant.path("sandbox").isBoolean()).isTrue();
+        assertThat(merchant.path("webhookSignatureEnabled").isBoolean()).isTrue();
+
+        ResponseEntity<JsonNode> customerResponse = post("/api/customers", customerBody("CLIENTE-C"), auth(apiKey));
+        assertThat(customerResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertHasFields(customerResponse.getBody(), "id");
+        String customerId = customerResponse.getBody().path("id").asText();
+        assertThat(get("/api/customers/by-reference?sourceSystem=STORE&externalReference=CLIENTE-C", apiKey)
+                .getBody().path("id").asText()).isEqualTo(customerId);
+
+        String invoiceId = createInvoice(apiKey, customerId, "PED-C");
+        JsonNode invoice = get("/api/invoices/by-reference?sourceSystem=STORE&externalReference=PED-C", apiKey).getBody();
+        assertHasFields(invoice, "id", "totalAmount", "status");
+        assertThat(invoice.path("id").asText()).isEqualTo(invoiceId);
+        assertThat(invoice.path("totalAmount").isNumber()).isTrue();
+
+        JsonNode pix = post("/api/charges", Map.of("invoiceId", invoiceId, "gateway", "MERCADO_PAGO", "method", "PIX"),
+                Map.of("X-API-Key", apiKey, "Idempotency-Key", "contrato-pix")).getBody();
+        assertHasFields(pix, "id", "invoiceId", "status", "amount", "method", "refundedAmount", "expiresAt");
+        assertHasFields(pix.path("pix"), "qrCode", "qrCodeBase64", "ticketUrl");
+        assertThat(pix.path("amount").isNumber()).isTrue();
+        String pixId = pix.path("id").asText();
+
+        JsonNode synced = post("/api/charges/" + pixId + "/sync", Map.of(), auth(apiKey)).getBody();
+        assertHasFields(synced, "id", "invoiceId", "status", "amount", "method");
+        assertThat(get("/api/charges/" + pixId, apiKey).getBody().path("id").asText()).isEqualTo(pixId);
+        JsonNode canceled = post("/api/charges/" + pixId + "/cancel", Map.of(), auth(apiKey)).getBody();
+        assertThat(canceled.path("status").asText()).isEqualTo("CANCELED");
+
+        JsonNode card = post("/api/charges", cardRequest(invoiceId, "approved-token"), auth(apiKey)).getBody();
+        assertHasFields(card, "id", "status", "statusDetail", "installments", "paidAt");
+        assertThat(card.path("status").asText()).isEqualTo("PAID");
+        JsonNode refunded = post("/api/charges/" + card.path("id").asText() + "/refund", Map.of(), auth(apiKey)).getBody();
+        assertHasFields(refunded, "id", "status", "refundedAmount");
+
+        String boletoInvoiceId = createInvoice(apiKey, customerId, "PED-C2");
+        Map<String, Object> address = Map.of("zipCode", "01310100", "street", "Av. Paulista", "number", "1000",
+                "neighborhood", "Bela Vista", "city", "São Paulo", "state", "SP");
+        JsonNode boleto = post("/api/charges", Map.of("invoiceId", boletoInvoiceId, "gateway", "MERCADO_PAGO",
+                "method", "BOLETO", "payer", Map.of("address", address)), auth(apiKey)).getBody();
+        assertHasFields(boleto.path("boleto"), "barcode", "digitableLine", "pdfUrl");
+    }
+
+    private static void assertHasFields(JsonNode node, String... fields) {
+        for (String field : fields) {
+            assertThat(node.has(field)).as("campo '%s' em %s", field, node).isTrue();
+        }
+    }
+
     @Test
     void merchantConfiguresOwnMercadoPagoCredentialsAfterVerification() {
         ResponseEntity<JsonNode> created = post("/api/admin/merchants",
