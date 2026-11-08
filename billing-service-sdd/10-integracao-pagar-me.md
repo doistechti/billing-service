@@ -41,8 +41,13 @@ Cliente: `store-api/.../infrastructure/payment/BilinsBillingGateway.java`. Fake 
 | `POST /api/admin/merchants` | devolve `merchant.id`, `apiKey`, `callbackSecret` |
 | Callbacks para a store | `X-Billing-Event`, `X-Billing-Delivery`, `X-Billing-Timestamp`, `X-Billing-Signature` |
 
-Validação: testes de contrato no billing que fixam o JSON dessas rotas, mais os `*IntegrationTest` do
-store-api (checkout, assinatura, configuração de pagamento) rodados contra o billing local.
+Validação: testes de contrato no billing que fixam o JSON dessas rotas e o callback
+(`storeConsumedJsonContractStaysStable`, `storeConsumedCallbackContractStaysStable`,
+`callbackEnvelopeIsTheSameForPagarMeMerchants`; verificador em `support/CallbackContract`).
+
+**Limite dessa garantia:** os `*IntegrationTest` do store-api usam o `FakeBilins`, um billing falso escrito pela própria
+store, então rodá-los **não exercita este código**. A prova ponta a ponta (store-api apontando `BILLING_BASE_URL` para
+este billing, com `BILLING_ADMIN_API_KEY`) é uma checagem manual a fazer **antes de qualquer deploy**.
 
 ## Desenho
 
@@ -194,7 +199,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + teste ponta a ponta com Pagar.me fake (47 testes verdes) | feito |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants (49 testes verdes) | feito |
 | 8 | Teste de isolamento entre merchants de gateways diferentes (`merchantsOfDifferentGatewaysCannotReachEachOthersData`; validado por mutação: quebrar `getById` faz o teste falhar) (50 testes verdes) | feito |
-| 9 | Rodar `*IntegrationTest` do store-api contra o billing local | pendente |
+| 9 | Contrato da store reforçado no billing, incluindo o **callback assinado** (verificador independente do `CallbackSigner`; mesmo envelope para Mercado Pago e Pagar.me; validado por mutação) (52 testes verdes). **Não** roda a store contra o billing real: ver nota abaixo | feito (opção b) |
 | 10 | Roteiro de testes e `pagar-me-development-setup.md` | pendente |
 
 Critério para fechar cada passo: `./mvnw verify` verde e nenhum teste de contrato alterado.

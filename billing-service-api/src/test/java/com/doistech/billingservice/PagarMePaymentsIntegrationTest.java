@@ -2,11 +2,13 @@ package com.doistech.billingservice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.doistech.billingservice.callback.CallbackDispatcher;
 import com.doistech.billingservice.core.merchant.Merchant;
 import com.doistech.billingservice.core.merchant.MerchantRepository;
 import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.shared.crypto.Hmac;
 import com.doistech.billingservice.shared.crypto.SecretCipher;
+import com.doistech.billingservice.support.CallbackContract;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -59,6 +61,7 @@ class PagarMePaymentsIntegrationTest {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     static final FakePagarMe pagarMe = new FakePagarMe();
+    static final CallbackReceiver callbackReceiver = new CallbackReceiver();
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -74,11 +77,13 @@ class PagarMePaymentsIntegrationTest {
     @BeforeAll
     static void startFake() {
         pagarMe.start();
+        callbackReceiver.start();
     }
 
     @AfterAll
     static void stopFake() {
         pagarMe.stop();
+        callbackReceiver.stop();
     }
 
     @Autowired
@@ -89,6 +94,9 @@ class PagarMePaymentsIntegrationTest {
 
     @Autowired
     private SecretCipher cipher;
+
+    @Autowired
+    private CallbackDispatcher callbackDispatcher;
 
     private final ObjectMapper json = new ObjectMapper();
     private Merchant merchant;
@@ -394,6 +402,49 @@ class PagarMePaymentsIntegrationTest {
                 .isEqualTo("WAITING_PAYMENT");
     }
 
+    /**
+     * O callback para o sistema cliente tem o mesmo envelope, evento e assinatura seja qual for o gateway (SDD 10,
+     * regra de compatibilidade 6). Mesma verificação independente usada para o Mercado Pago.
+     */
+    @Test
+    void callbackEnvelopeIsTheSameForPagarMeMerchants() {
+        JsonNode created = post("/api/admin/merchants", Map.of("code", "curso-callback", "name", "Curso callback",
+                "gateway", "PAGAR_ME", "callbackUrl", callbackReceiver.url()), Map.of("X-Admin-Key", "admin-key-test")).getBody();
+        String key = created.path("apiKey").asText();
+        String callbackSecret = created.path("callbackSecret").asText();
+        String merchantId = created.path("merchant").path("id").asText();
+        assertThat(put("/api/merchant/pagar-me", Map.of("secretKey", "sk_test_cb", "publicKey", "pk_test_cb",
+                "webhookSecret", "whsec-cb"), Map.of("X-API-Key", key)).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String invoiceId = createInvoiceFor(key, "CB-1");
+        JsonNode charge = post("/api/charges", Map.of("invoiceId", invoiceId, "gateway", "PAGAR_ME", "method", "PIX"),
+                Map.of("X-API-Key", key)).getBody();
+        String gatewayChargeId = charge.path("gatewayPaymentId").asText();
+        pagarMe.markPaid(gatewayChargeId);
+        assertThat(post("/api/webhooks/pagar-me/" + merchantId + "?token=whsec-cb", chargeEvent("charge.paid", gatewayChargeId),
+                Map.of()).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode paid = nextCallback(callbackSecret, "charge.paid", "PAID");
+        assertThat(paid.path("data").path("method").asText()).isEqualTo("PIX");
+        assertThat(paid.path("data").path("gatewayPaymentId").asText()).isEqualTo(gatewayChargeId);
+        // 21:00 UTC do Pagar.me chega como 18:00, horário de Brasília e sem fuso, como o Mercado Pago.
+        assertThat(java.time.LocalDateTime.parse(paid.path("data").path("paidAt").asText()))
+                .isEqualTo(java.time.LocalDateTime.of(2026, 9, 25, 18, 0));
+        assertThat(paid.path("data").path("invoiceStatus").asText()).isEqualTo("PAID");
+
+        post("/api/charges/" + charge.path("id").asText() + "/refund", Map.of(), Map.of("X-API-Key", key));
+        JsonNode refunded = nextCallback(callbackSecret, "charge.refunded", "REFUNDED");
+        assertThat(refunded.path("id").asText()).isNotEqualTo(paid.path("id").asText());
+    }
+
+    private JsonNode nextCallback(String secret, String expectedEvent, String expectedStatus) {
+        callbackReceiver.requests.clear();
+        assertThat(callbackDispatcher.dispatchDue()).isEqualTo(1);
+        assertThat(callbackReceiver.requests).hasSize(1);
+        ReceivedCallback callback = callbackReceiver.requests.get(0);
+        return CallbackContract.assertStoreCompatible(secret, callback.headers(), callback.body(), expectedEvent, expectedStatus);
+    }
+
     private void assertNotVisible(ResponseEntity<JsonNode> response) {
         if (response.getStatusCode().is2xxSuccessful()) {
             assertThat(response.getBody()).isEmpty();
@@ -580,6 +631,41 @@ class PagarMePaymentsIntegrationTest {
             ObjectNode order = json.createObjectNode().put("id", "or_" + ids.incrementAndGet()).put("status", "pending");
             order.putArray("charges").add(charge);
             return order;
+        }
+    }
+
+    record ReceivedCallback(Map<String, String> headers, String body) {
+    }
+
+    /** Sistema cliente falso que recebe os callbacks. */
+    static class CallbackReceiver {
+
+        final List<ReceivedCallback> requests = new CopyOnWriteArrayList<>();
+        private HttpServer server;
+
+        void start() {
+            try {
+                server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            } catch (IOException exception) {
+                throw new IllegalStateException(exception);
+            }
+            server.createContext("/billing/callback", exchange -> {
+                Map<String, String> headers = new ConcurrentHashMap<>();
+                exchange.getRequestHeaders().forEach((name, values) -> headers.put(name, values.get(0)));
+                requests.add(new ReceivedCallback(headers,
+                        new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                exchange.sendResponseHeaders(204, -1);
+                exchange.close();
+            });
+            server.start();
+        }
+
+        void stop() {
+            server.stop(0);
+        }
+
+        String url() {
+            return "http://127.0.0.1:" + server.getAddress().getPort() + "/billing/callback";
         }
     }
 }

@@ -10,6 +10,7 @@ import com.doistech.billingservice.core.merchant.MerchantRepository;
 import com.doistech.billingservice.core.merchant.MerchantService;
 import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.shared.crypto.SecretCipher;
+import com.doistech.billingservice.support.CallbackContract;
 import com.doistech.billingservice.shared.crypto.Hmac;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -333,6 +334,63 @@ class MerchantPaymentsIntegrationTest {
         JsonNode boleto = post("/api/charges", Map.of("invoiceId", boletoInvoiceId, "gateway", "MERCADO_PAGO",
                 "method", "BOLETO", "payer", Map.of("address", address)), auth(apiKey)).getBody();
         assertHasFields(boleto.path("boleto"), "barcode", "digitableLine", "pdfUrl");
+    }
+
+    /**
+     * Callback consumido pela doistech-store: todo evento que a store trata (paid, rejected, canceled, expired,
+     * refunded) chega assinado, com o envelope e o status que o contrato da store espera. A verificação é independente
+     * do CallbackSigner do billing (ver CallbackContract).
+     */
+    @Test
+    void storeConsumedCallbackContractStaysStable() {
+        JsonNode created = createMerchant("store-callback", STORE_TOKEN, null);
+        String apiKey = created.path("apiKey").asText();
+        String secret = created.path("callbackSecret").asText();
+        String customerId = createCustomer(apiKey, "CLIENTE-CB");
+        List<String> deliveryIds = new java.util.ArrayList<>();
+
+        // charge.paid (cartão aprovado) e charge.refunded (estorno total).
+        String paidInvoice = createInvoice(apiKey, customerId, "PED-CB-1");
+        JsonNode paid = post("/api/charges", cardRequest(paidInvoice, "approved-token"), auth(apiKey)).getBody();
+        deliveryIds.add(nextCallback(secret, "charge.paid", "PAID").path("id").asText());
+        post("/api/charges/" + paid.path("id").asText() + "/refund", Map.of(), auth(apiKey));
+        JsonNode refunded = nextCallback(secret, "charge.refunded", "REFUNDED");
+        deliveryIds.add(refunded.path("id").asText());
+        assertThat(refunded.path("data").path("refundedAmount").decimalValue())
+                .isEqualByComparingTo(refunded.path("data").path("amount").decimalValue());
+
+        // charge.rejected (cartão recusado).
+        String rejectedInvoice = createInvoice(apiKey, customerId, "PED-CB-2");
+        post("/api/charges", cardRequest(rejectedInvoice, "rejected-token"), auth(apiKey));
+        JsonNode rejected = nextCallback(secret, "charge.rejected", "REJECTED");
+        deliveryIds.add(rejected.path("id").asText());
+        assertThat(rejected.path("data").path("statusDetail").asText()).isEqualTo("cc_rejected_insufficient_amount");
+
+        // charge.canceled (Pix cancelado) e charge.expired (Pix vencido no gateway, visto por sync).
+        String canceledInvoice = createInvoice(apiKey, customerId, "PED-CB-3");
+        JsonNode pixToCancel = post("/api/charges", Map.of("invoiceId", canceledInvoice, "gateway", "MERCADO_PAGO", "method", "PIX"),
+                auth(apiKey)).getBody();
+        post("/api/charges/" + pixToCancel.path("id").asText() + "/cancel", Map.of(), auth(apiKey));
+        deliveryIds.add(nextCallback(secret, "charge.canceled", "CANCELED").path("id").asText());
+
+        String expiredInvoice = createInvoice(apiKey, customerId, "PED-CB-4");
+        JsonNode pixToExpire = post("/api/charges", Map.of("invoiceId", expiredInvoice, "gateway", "MERCADO_PAGO", "method", "PIX"),
+                auth(apiKey)).getBody();
+        mercadoPago.setStatus(pixToExpire.path("gatewayPaymentId").asText(), "cancelled", "expired");
+        post("/api/charges/" + pixToExpire.path("id").asText() + "/sync", Map.of(), auth(apiKey));
+        deliveryIds.add(nextCallback(secret, "charge.expired", "EXPIRED").path("id").asText());
+
+        // Cada entrega tem um id próprio: a store o usa como chave de idempotência.
+        assertThat(deliveryIds).doesNotHaveDuplicates().hasSize(5);
+    }
+
+    /** Despacha o próximo callback pendente e o confere como a store faria. */
+    private JsonNode nextCallback(String secret, String expectedEvent, String expectedStatus) {
+        callbackReceiver.requests.clear();
+        assertThat(callbackDispatcher.dispatchDue()).isEqualTo(1);
+        assertThat(callbackReceiver.requests).hasSize(1);
+        ReceivedCallback callback = callbackReceiver.requests.get(0);
+        return CallbackContract.assertStoreCompatible(secret, callback.headers(), callback.body(), expectedEvent, expectedStatus);
     }
 
     private static void assertHasFields(JsonNode node, String... fields) {
