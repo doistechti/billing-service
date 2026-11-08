@@ -6,7 +6,7 @@ import com.doistech.billingservice.core.invoice.InvoiceRepository;
 import com.doistech.billingservice.core.invoice.InvoiceStatus;
 import com.doistech.billingservice.core.payment.Payment;
 import com.doistech.billingservice.core.payment.PaymentRepository;
-import com.doistech.billingservice.gateway.mercadopago.GatewayPaymentResponse;
+import com.doistech.billingservice.gateway.GatewayPaymentResponse;
 import com.doistech.billingservice.gateway.mercadopago.MercadoPagoStatusMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

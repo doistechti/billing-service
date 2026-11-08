@@ -3,8 +3,8 @@ package com.doistech.billingservice.core.merchant;
 import com.doistech.billingservice.api.MerchantApi.CreateMerchantRequest;
 import com.doistech.billingservice.api.MerchantApi.UpdateMerchantRequest;
 import com.doistech.billingservice.config.MercadoPagoProperties;
-import com.doistech.billingservice.gateway.mercadopago.MercadoPagoAccount;
-import com.doistech.billingservice.gateway.mercadopago.PaymentGatewayService;
+import com.doistech.billingservice.gateway.GatewayAccount;
+import com.doistech.billingservice.gateway.PaymentGatewayService;
 import com.doistech.billingservice.shared.GatewayIntegrationException;
 import com.doistech.billingservice.shared.BusinessRuleException;
 import com.doistech.billingservice.shared.ConflictException;
@@ -26,7 +26,7 @@ public class MerchantService {
     private final MerchantRepository merchantRepository;
     private final SecretCipher cipher;
     private final MercadoPagoProperties mercadoPagoProperties;
-    private final java.util.function.Function<String, MercadoPagoAccount> accountVerifier;
+    private final java.util.function.Function<String, GatewayAccount> accountVerifier;
 
     public MerchantService(
             MerchantRepository merchantRepository,
@@ -130,7 +130,7 @@ public class MerchantService {
         if (tokenIsTest != keyIsTest) {
             throw new BusinessRuleException("access token and public key must both be test or both be production credentials");
         }
-        MercadoPagoAccount account = accountVerifier.apply(token);
+        GatewayAccount account = accountVerifier.apply(token);
         if (newToken) {
             merchant.setMercadoPagoAccessTokenEncrypted(cipher.encrypt(token));
         }

@@ -9,7 +9,7 @@ import com.doistech.billingservice.core.invoice.InvoiceRepository;
 import com.doistech.billingservice.core.invoice.InvoiceStatus;
 import com.doistech.billingservice.core.merchant.MerchantService;
 import com.doistech.billingservice.core.payment.Gateway;
-import com.doistech.billingservice.gateway.mercadopago.PaymentGatewayService;
+import com.doistech.billingservice.gateway.PaymentGatewayService;
 import com.doistech.billingservice.shared.BusinessRuleException;
 import java.util.Optional;
 import java.util.UUID;

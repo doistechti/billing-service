@@ -7,6 +7,12 @@ import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.invoice.InvoiceItem;
 import com.doistech.billingservice.core.merchant.MerchantCredentials;
 import com.doistech.billingservice.core.payment.Gateway;
+import com.doistech.billingservice.gateway.ChargeGatewayResponse;
+import com.doistech.billingservice.gateway.DirectPaymentRequest;
+import com.doistech.billingservice.gateway.GatewayAccount;
+import com.doistech.billingservice.gateway.GatewayPaymentResponse;
+import com.doistech.billingservice.gateway.GatewayRefundResponse;
+import com.doistech.billingservice.gateway.PaymentGatewayService;
 import com.doistech.billingservice.shared.GatewayIntegrationException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
@@ -150,10 +156,10 @@ public class MercadoPagoGatewayService implements PaymentGatewayService {
     }
 
     @Override
-    public MercadoPagoAccount verifyAccount(String accessToken) {
+    public GatewayAccount verifyAccount(String accessToken) {
         MerchantCredentials probe = new MerchantCredentials(null, accessToken, null, null, false, null);
         JsonNode response = send(probe, "GET", "/users/me", null, null);
-        return new MercadoPagoAccount(text(response, "id"), text(response, "nickname"), text(response, "site_id"));
+        return new GatewayAccount(text(response, "id"), text(response, "nickname"), text(response, "site_id"));
     }
 
     private GatewayPaymentResponse toPaymentResponse(JsonNode response) {

@@ -1,4 +1,4 @@
-package com.doistech.billingservice.gateway.mercadopago;
+package com.doistech.billingservice.gateway;
 
 import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.merchant.MerchantCredentials;
@@ -26,5 +26,5 @@ public interface PaymentGatewayService {
     /**
      * Confirma que o access token é válido e devolve a conta dona dele.
      */
-    MercadoPagoAccount verifyAccount(String accessToken);
+    GatewayAccount verifyAccount(String accessToken);
 }

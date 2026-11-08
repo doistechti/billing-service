@@ -149,8 +149,8 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 0 | Documentação (este SDD e acréscimos nos SDD 02, 04, 05, 06, 07, 09, README) | feito |
 | 1 | Linha de base: `./mvnw verify` verde na `main` antes de mexer (20 testes) | feito |
 | 2 | Testes de contrato fixando o JSON atual das rotas usadas pela store (`storeConsumedJsonContractStaysStable`) | feito |
-| 3 | Refatoração: mover interface e tipos neutros para `gateway`, `GatewayAccount`, router | pendente |
-| 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) | pendente |
+| 3 | Refatoração: interface e tipos neutros movidos para `gateway`, `MercadoPagoAccount` → `GatewayAccount` (21 testes verdes) | feito |
+| 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter` (o router depende da coluna, por isso saiu do passo 3) | pendente |
 | 5 | `PagarMeGatewayService` + `PagarMeStatusMapper` + testes | pendente |
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + testes | pendente |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants | pendente |

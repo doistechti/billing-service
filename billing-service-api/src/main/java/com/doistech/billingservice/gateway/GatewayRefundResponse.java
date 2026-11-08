@@ -1,4 +1,4 @@
-package com.doistech.billingservice.gateway.mercadopago;
+package com.doistech.billingservice.gateway;
 
 import java.math.BigDecimal;
 

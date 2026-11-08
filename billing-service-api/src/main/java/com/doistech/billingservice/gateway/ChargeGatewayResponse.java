@@ -1,4 +1,4 @@
-package com.doistech.billingservice.gateway.mercadopago;
+package com.doistech.billingservice.gateway;
 
 import com.doistech.billingservice.core.charge.ChargeStatus;
 import com.doistech.billingservice.core.payment.Gateway;

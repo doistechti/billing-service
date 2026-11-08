@@ -15,7 +15,7 @@ import com.doistech.billingservice.core.invoice.InvoiceStatus;
 import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.core.payment.Payment;
 import com.doistech.billingservice.core.payment.PaymentRepository;
-import com.doistech.billingservice.gateway.mercadopago.GatewayPaymentResponse;
+import com.doistech.billingservice.gateway.GatewayPaymentResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
