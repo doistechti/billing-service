@@ -2,9 +2,15 @@ package com.doistech.billingservice.gateway;
 
 import com.doistech.billingservice.core.invoice.Invoice;
 import com.doistech.billingservice.core.merchant.MerchantCredentials;
+import com.doistech.billingservice.core.payment.Gateway;
 import java.math.BigDecimal;
 
 public interface PaymentGatewayService {
+
+    /**
+     * Gateway que esta implementação atende. O {@link PaymentGatewayRouter} escolhe por ele.
+     */
+    Gateway gateway();
 
     /**
      * Checkout Pro: cria uma preferência e devolve a URL de pagamento hospedada.

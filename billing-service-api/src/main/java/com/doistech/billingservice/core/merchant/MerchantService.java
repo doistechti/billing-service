@@ -4,7 +4,8 @@ import com.doistech.billingservice.api.MerchantApi.CreateMerchantRequest;
 import com.doistech.billingservice.api.MerchantApi.UpdateMerchantRequest;
 import com.doistech.billingservice.config.MercadoPagoProperties;
 import com.doistech.billingservice.gateway.GatewayAccount;
-import com.doistech.billingservice.gateway.PaymentGatewayService;
+import com.doistech.billingservice.core.payment.Gateway;
+import com.doistech.billingservice.gateway.PaymentGatewayRouter;
 import com.doistech.billingservice.shared.GatewayIntegrationException;
 import com.doistech.billingservice.shared.BusinessRuleException;
 import com.doistech.billingservice.shared.ConflictException;
@@ -32,14 +33,14 @@ public class MerchantService {
             MerchantRepository merchantRepository,
             SecretCipher cipher,
             MercadoPagoProperties mercadoPagoProperties,
-            @org.springframework.context.annotation.Lazy PaymentGatewayService paymentGatewayService
+            @org.springframework.context.annotation.Lazy PaymentGatewayRouter gatewayRouter
     ) {
         this.merchantRepository = merchantRepository;
         this.cipher = cipher;
         this.mercadoPagoProperties = mercadoPagoProperties;
         this.accountVerifier = token -> {
             try {
-                return paymentGatewayService.verifyAccount(token);
+                return gatewayRouter.forGateway(Gateway.MERCADO_PAGO).verifyAccount(token);
             } catch (GatewayIntegrationException exception) {
                 if (exception.isTransient()) {
                     throw exception;
@@ -174,6 +175,20 @@ public class MerchantService {
     @Transactional(readOnly = true)
     public MerchantCredentials credentials(UUID merchantId) {
         Merchant merchant = getById(merchantId);
+        if (merchant.getGateway() == Gateway.PAGAR_ME) {
+            String secretKey = cipher.decrypt(merchant.getPagarMeSecretKeyEncrypted());
+            if (!StringUtils.hasText(secretKey)) {
+                throw new BusinessRuleException("pagar.me secret key is not configured for merchant");
+            }
+            // O record é só um portador em memória: accessToken carrega a secret key do Pagar.me.
+            return new MerchantCredentials(
+                    merchant.getId(),
+                    secretKey,
+                    merchant.getPagarMePublicKey(),
+                    cipher.decrypt(merchant.getPagarMeWebhookSecretEncrypted()),
+                    merchant.isSandbox(),
+                    notificationUrl(merchant));
+        }
         String accessToken = cipher.decrypt(merchant.getMercadoPagoAccessTokenEncrypted());
         if (!StringUtils.hasText(accessToken)) {
             throw new BusinessRuleException("mercado pago access token is not configured for merchant");
@@ -188,9 +203,17 @@ public class MerchantService {
     }
 
     @Transactional(readOnly = true)
+    public Gateway gatewayOf(UUID merchantId) {
+        return getById(merchantId).getGateway();
+    }
+
+    @Transactional(readOnly = true)
     public Optional<String> webhookSecret(UUID merchantId) {
-        return Optional.ofNullable(cipher.decrypt(getById(merchantId).getMercadoPagoWebhookSecretEncrypted()))
-                .filter(StringUtils::hasText);
+        Merchant merchant = getById(merchantId);
+        String encrypted = merchant.getGateway() == Gateway.PAGAR_ME
+                ? merchant.getPagarMeWebhookSecretEncrypted()
+                : merchant.getMercadoPagoWebhookSecretEncrypted();
+        return Optional.ofNullable(cipher.decrypt(encrypted)).filter(StringUtils::hasText);
     }
 
     @Transactional(readOnly = true)
@@ -206,7 +229,8 @@ public class MerchantService {
         if (merchant.isLegacy()) {
             return mercadoPagoProperties.notificationUrl();
         }
-        return mercadoPagoProperties.webhookBaseUrl() + "/api/webhooks/mercado-pago/" + merchant.getId();
+        String route = merchant.getGateway() == Gateway.PAGAR_ME ? "pagar-me" : "mercado-pago";
+        return mercadoPagoProperties.webhookBaseUrl() + "/api/webhooks/" + route + "/" + merchant.getId();
     }
 
     /**

@@ -35,6 +35,11 @@ import org.springframework.web.client.RestClientResponseException;
 @Service
 public class MercadoPagoGatewayService implements PaymentGatewayService {
 
+    @Override
+    public Gateway gateway() {
+        return Gateway.MERCADO_PAGO;
+    }
+
     private static final Logger log = LoggerFactory.getLogger(MercadoPagoGatewayService.class);
     private static final DateTimeFormatter MP_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
 

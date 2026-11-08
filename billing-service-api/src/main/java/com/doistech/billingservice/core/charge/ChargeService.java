@@ -15,6 +15,7 @@ import com.doistech.billingservice.gateway.DirectPaymentRequest;
 import com.doistech.billingservice.gateway.GatewayPaymentResponse;
 import com.doistech.billingservice.gateway.GatewayRefundResponse;
 import com.doistech.billingservice.gateway.mercadopago.MercadoPagoGatewayService;
+import com.doistech.billingservice.gateway.PaymentGatewayRouter;
 import com.doistech.billingservice.gateway.PaymentGatewayService;
 import com.doistech.billingservice.shared.BusinessRuleException;
 import com.doistech.billingservice.shared.ConflictException;
@@ -41,20 +42,20 @@ public class ChargeService {
 
     private final ChargeRepository chargeRepository;
     private final InvoiceRepository invoiceRepository;
-    private final PaymentGatewayService paymentGatewayService;
+    private final PaymentGatewayRouter gatewayRouter;
     private final MerchantService merchantService;
     private final ChargeStatusSynchronizer synchronizer;
 
     public ChargeService(
             ChargeRepository chargeRepository,
             InvoiceRepository invoiceRepository,
-            PaymentGatewayService paymentGatewayService,
+            PaymentGatewayRouter gatewayRouter,
             MerchantService merchantService,
             ChargeStatusSynchronizer synchronizer
     ) {
         this.chargeRepository = chargeRepository;
         this.invoiceRepository = invoiceRepository;
-        this.paymentGatewayService = paymentGatewayService;
+        this.gatewayRouter = gatewayRouter;
         this.merchantService = merchantService;
         this.synchronizer = synchronizer;
     }
@@ -76,9 +77,11 @@ public class ChargeService {
             }
         }
 
-        if (request.gateway() != Gateway.MERCADO_PAGO) {
-            throw new BusinessRuleException("unsupported payment gateway");
+        Gateway gateway = merchantService.gatewayOf(merchantId);
+        if (request.gateway() != gateway) {
+            throw new BusinessRuleException("gateway mismatch: this merchant receives through " + gateway);
         }
+        PaymentGatewayService paymentGatewayService = gatewayRouter.forGateway(gateway);
 
         Invoice invoice = invoiceRepository.findByIdAndMerchantId(request.invoiceId(), merchantId)
                 .orElseThrow(() -> new NotFoundException("invoice not found"));
@@ -98,7 +101,7 @@ public class ChargeService {
         Charge charge = new Charge();
         charge.setMerchantId(merchantId);
         charge.setInvoice(invoice);
-        charge.setGateway(Gateway.MERCADO_PAGO);
+        charge.setGateway(gateway);
         charge.setMethod(method);
         charge.setAmount(invoice.getTotalAmount());
         charge.setIdempotencyKey(StringUtils.hasText(idempotencyKey) ? idempotencyKey : null);
@@ -151,7 +154,7 @@ public class ChargeService {
             return charge;
         }
         MerchantCredentials credentials = merchantService.credentials(merchantId);
-        synchronizer.apply(charge, paymentGatewayService.getPayment(credentials, charge.getGatewayPaymentId()));
+        synchronizer.apply(charge, gatewayRouter.forGateway(charge.getGateway()).getPayment(credentials, charge.getGatewayPaymentId()));
         return charge;
     }
 
@@ -166,7 +169,7 @@ public class ChargeService {
         }
         if (StringUtils.hasText(charge.getGatewayPaymentId())) {
             MerchantCredentials credentials = merchantService.credentials(merchantId);
-            synchronizer.apply(charge, paymentGatewayService.cancelPayment(credentials, charge.getGatewayPaymentId()));
+            synchronizer.apply(charge, gatewayRouter.forGateway(charge.getGateway()).cancelPayment(credentials, charge.getGatewayPaymentId()));
         } else {
             synchronizer.cancelLocally(charge);
         }
@@ -191,7 +194,7 @@ public class ChargeService {
         MerchantCredentials credentials = merchantService.credentials(merchantId);
         // Estorno total vai sem valor para o gateway, que devolve o saldo inteiro.
         BigDecimal gatewayAmount = amount == null ? null : refundAmount;
-        GatewayRefundResponse refund = paymentGatewayService.refund(
+        GatewayRefundResponse refund = gatewayRouter.forGateway(charge.getGateway()).refund(
                 credentials, charge.getGatewayPaymentId(), gatewayAmount, idempotencyKey);
         synchronizer.applyRefund(charge, refund.amount() == null ? refundAmount : refund.amount());
         log.info("charge refunded chargeId={} amount={} refundId={} status={}",

@@ -4,6 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.doistech.billingservice.callback.CallbackDispatcher;
 import com.doistech.billingservice.callback.CallbackSigner;
+import com.doistech.billingservice.core.merchant.Merchant;
+import com.doistech.billingservice.core.merchant.MerchantCredentials;
+import com.doistech.billingservice.core.merchant.MerchantRepository;
+import com.doistech.billingservice.core.merchant.MerchantService;
+import com.doistech.billingservice.core.payment.Gateway;
+import com.doistech.billingservice.shared.crypto.SecretCipher;
 import com.doistech.billingservice.shared.crypto.Hmac;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,6 +95,15 @@ class MerchantPaymentsIntegrationTest {
 
     @Autowired
     private CallbackDispatcher callbackDispatcher;
+
+    @Autowired
+    private MerchantRepository merchantRepository;
+
+    @Autowired
+    private MerchantService merchantService;
+
+    @Autowired
+    private SecretCipher cipher;
 
     private final ObjectMapper json = new ObjectMapper();
 
@@ -225,6 +240,35 @@ class MerchantPaymentsIntegrationTest {
         assertThat(charge.path("method").asText()).isEqualTo("CHECKOUT_PRO");
         assertThat(charge.path("paymentUrl").asText()).isEqualTo("https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref-1");
         assertThat(mercadoPago.lastAuthorization).isEqualTo("Bearer " + LEGACY_TOKEN);
+    }
+
+    /**
+     * V4 (SDD 10): merchants existentes seguem MERCADO_PAGO; um merchant PAGAR_ME resolve as credenciais dele
+     * (secret key cifrada, rota de webhook própria) e ainda não aceita cobrança enquanto o gateway não existe.
+     */
+    @Test
+    void merchantGatewayDefaultsToMercadoPagoAndPagarMeMerchantResolvesItsOwnCredentials() {
+        createMerchant("store-default-gateway", STORE_TOKEN, null);
+        assertThat(merchantRepository.findAll()).isNotEmpty()
+                .allSatisfy(merchant -> assertThat(merchant.getGateway()).isEqualTo(Gateway.MERCADO_PAGO));
+
+        Merchant curso = new Merchant();
+        curso.setCode("curso-pagarme");
+        curso.setName("Curso livre");
+        curso.setGateway(Gateway.PAGAR_ME);
+        curso.setPagarMeSecretKeyEncrypted(cipher.encrypt("sk_test_curso"));
+        curso.setPagarMePublicKey("pk_test_curso");
+        curso.setPagarMeWebhookSecretEncrypted(cipher.encrypt("whsec-curso"));
+        curso.setActive(true);
+        Merchant saved = merchantRepository.save(curso);
+
+        MerchantCredentials credentials = merchantService.credentials(saved.getId());
+        assertThat(credentials.accessToken()).isEqualTo("sk_test_curso");
+        assertThat(credentials.publicKey()).isEqualTo("pk_test_curso");
+        assertThat(credentials.webhookSecret()).isEqualTo("whsec-curso");
+        assertThat(credentials.notificationUrl()).endsWith("/api/webhooks/pagar-me/" + saved.getId());
+        assertThat(merchantService.webhookSecret(saved.getId())).contains("whsec-curso");
+        assertThat(merchantService.gatewayOf(saved.getId())).isEqualTo(Gateway.PAGAR_ME);
     }
 
     /**

@@ -1,8 +1,11 @@
 package com.doistech.billingservice.core.merchant;
 
+import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.util.UUID;
 
@@ -18,6 +21,10 @@ public class Merchant extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private Gateway gateway = Gateway.MERCADO_PAGO;
+
     @Column(name = "api_key_hash", length = 64)
     private String apiKeyHash;
 
@@ -32,6 +39,24 @@ public class Merchant extends BaseEntity {
 
     @Column(name = "mp_webhook_secret_encrypted")
     private String mercadoPagoWebhookSecretEncrypted;
+
+    @Column(name = "pm_secret_key_encrypted")
+    private String pagarMeSecretKeyEncrypted;
+
+    @Column(name = "pm_public_key")
+    private String pagarMePublicKey;
+
+    @Column(name = "pm_webhook_secret_encrypted")
+    private String pagarMeWebhookSecretEncrypted;
+
+    @Column(name = "pm_account_id", length = 60)
+    private String pagarMeAccountId;
+
+    @Column(name = "pm_account_name", length = 120)
+    private String pagarMeAccountName;
+
+    @Column(name = "pm_verified_at")
+    private java.time.LocalDateTime pagarMeVerifiedAt;
 
     @Column(nullable = false)
     private boolean sandbox;
@@ -162,5 +187,55 @@ public class Merchant extends BaseEntity {
         this.mercadoPagoAccountId = accountId;
         this.mercadoPagoAccountNickname = nickname;
         this.mercadoPagoVerifiedAt = at;
+    }
+
+    public Gateway getGateway() {
+        return gateway;
+    }
+
+    public void setGateway(Gateway gateway) {
+        this.gateway = gateway;
+    }
+
+    public String getPagarMeSecretKeyEncrypted() {
+        return pagarMeSecretKeyEncrypted;
+    }
+
+    public void setPagarMeSecretKeyEncrypted(String pagarMeSecretKeyEncrypted) {
+        this.pagarMeSecretKeyEncrypted = pagarMeSecretKeyEncrypted;
+    }
+
+    public String getPagarMePublicKey() {
+        return pagarMePublicKey;
+    }
+
+    public void setPagarMePublicKey(String pagarMePublicKey) {
+        this.pagarMePublicKey = pagarMePublicKey;
+    }
+
+    public String getPagarMeWebhookSecretEncrypted() {
+        return pagarMeWebhookSecretEncrypted;
+    }
+
+    public void setPagarMeWebhookSecretEncrypted(String pagarMeWebhookSecretEncrypted) {
+        this.pagarMeWebhookSecretEncrypted = pagarMeWebhookSecretEncrypted;
+    }
+
+    public String getPagarMeAccountId() {
+        return pagarMeAccountId;
+    }
+
+    public String getPagarMeAccountName() {
+        return pagarMeAccountName;
+    }
+
+    public java.time.LocalDateTime getPagarMeVerifiedAt() {
+        return pagarMeVerifiedAt;
+    }
+
+    public void markPagarMeVerified(String accountId, String name, java.time.LocalDateTime at) {
+        this.pagarMeAccountId = accountId;
+        this.pagarMeAccountName = name;
+        this.pagarMeVerifiedAt = at;
     }
 }

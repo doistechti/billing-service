@@ -10,7 +10,7 @@ import com.doistech.billingservice.core.merchant.MerchantCredentials;
 import com.doistech.billingservice.core.merchant.MerchantService;
 import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.gateway.GatewayPaymentResponse;
-import com.doistech.billingservice.gateway.PaymentGatewayService;
+import com.doistech.billingservice.gateway.PaymentGatewayRouter;
 import com.doistech.billingservice.shared.BusinessRuleException;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -24,20 +24,20 @@ import org.springframework.util.StringUtils;
 public class WebhookPaymentProcessor {
 
     private final MerchantService merchantService;
-    private final PaymentGatewayService paymentGatewayService;
+    private final PaymentGatewayRouter gatewayRouter;
     private final ChargeRepository chargeRepository;
     private final InvoiceRepository invoiceRepository;
     private final ChargeStatusSynchronizer synchronizer;
 
     public WebhookPaymentProcessor(
             MerchantService merchantService,
-            PaymentGatewayService paymentGatewayService,
+            PaymentGatewayRouter gatewayRouter,
             ChargeRepository chargeRepository,
             InvoiceRepository invoiceRepository,
             ChargeStatusSynchronizer synchronizer
     ) {
         this.merchantService = merchantService;
-        this.paymentGatewayService = paymentGatewayService;
+        this.gatewayRouter = gatewayRouter;
         this.chargeRepository = chargeRepository;
         this.invoiceRepository = invoiceRepository;
         this.synchronizer = synchronizer;
@@ -46,9 +46,10 @@ public class WebhookPaymentProcessor {
     @Transactional
     public Charge process(UUID merchantId, String gatewayPaymentId) {
         MerchantCredentials credentials = merchantService.credentials(merchantId);
-        GatewayPaymentResponse payment = paymentGatewayService.getPayment(credentials, gatewayPaymentId);
+        Gateway gateway = merchantService.gatewayOf(merchantId);
+        GatewayPaymentResponse payment = gatewayRouter.forGateway(gateway).getPayment(credentials, gatewayPaymentId);
         Charge charge = chargeRepository
-                .findFirstByMerchantIdAndGatewayAndGatewayPaymentId(merchantId, Gateway.MERCADO_PAGO, payment.gatewayPaymentId())
+                .findFirstByMerchantIdAndGatewayAndGatewayPaymentId(merchantId, gateway, payment.gatewayPaymentId())
                 .orElseGet(() -> resolveByExternalReference(merchantId, payment));
         synchronizer.apply(charge, payment);
         return charge;

@@ -55,7 +55,7 @@ store-api (checkout, assinatura, configuração de pagamento) rodados contra o b
 - `MercadoPagoAccount` vira `GatewayAccount` (`id`, `nickname`, `siteId` opcional).
 - Um `PaymentGatewayRouter` escolhe a implementação pelo `gateway` do merchant autenticado.
 - `POST /api/charges` com `gateway` ausente usa o gateway do merchant. Se vier preenchido e **diferente** do
-  gateway do merchant → 422 `gateway_mismatch` (a store manda `MERCADO_PAGO` para merchants MP, então segue válido).
+  gateway do merchant → 400 com mensagem `gateway mismatch: this merchant receives through <GATEWAY>` (a store manda `MERCADO_PAGO` para merchants MP, então segue válido).
 
 ### 2. Credenciais Pagar.me no merchant (V4)
 
@@ -150,8 +150,8 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 1 | Linha de base: `./mvnw verify` verde na `main` antes de mexer (20 testes) | feito |
 | 2 | Testes de contrato fixando o JSON atual das rotas usadas pela store (`storeConsumedJsonContractStaysStable`) | feito |
 | 3 | Refatoração: interface e tipos neutros movidos para `gateway`, `MercadoPagoAccount` → `GatewayAccount` (21 testes verdes) | feito |
-| 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter` (o router depende da coluna, por isso saiu do passo 3) | pendente |
-| 5 | `PagarMeGatewayService` + `PagarMeStatusMapper` + testes | pendente |
+| 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter`; `ChargeService`, webhook e `MerchantService` já usam o gateway do merchant (26 testes verdes) | feito |
+| 5 | `PagarMeGatewayService` + `PagarMeStatusMapper` + testes. Inclui tornar o mapeamento de status por gateway: hoje `ChargeStatusSynchronizer` chama `MercadoPagoStatusMapper` direto | pendente |
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + testes | pendente |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants | pendente |
 | 8 | Teste de isolamento entre merchants de gateways diferentes | pendente |
