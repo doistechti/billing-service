@@ -93,3 +93,8 @@ O paymentUrl deve preferencialmente usar sandboxInitPoint quando disponível.
 Produção deve ser ativada apenas trocando variáveis de ambiente.
 
 Nunca deixar token fixo no código.
+
+## Atualização — outros gateways
+
+Este documento descreve só o Mercado Pago, que segue inalterado. A integração com o Pagar.me está no
+[SDD 10](10-integracao-pagar-me.md). A interface `PaymentGatewayService` é a mesma para ambos.

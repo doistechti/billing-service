@@ -166,3 +166,14 @@ Response:
 4. Payment só nasce após retorno/consulta do gateway.
 5. Invoice paga não pode ser cancelada pela POC.
 6. Invoice cancelada não pode gerar charge.
+
+## Atualização — Pagar.me (SDD 10)
+
+Adições, sem alterar as rotas acima:
+
+- `POST /charges`: o campo `gateway` aceita também `PAGAR_ME`. Se omitido, vale o gateway do merchant.
+  Valor diferente do gateway do merchant → 422 `gateway_mismatch`.
+- `PUT /merchant/pagar-me`: cadastro das credenciais Pagar.me pelo próprio merchant.
+- `GET /merchant`: campos novos `gateway`, `pagarMeConfigured`, `pagarMePublicKey`, `pagarMeAccountName`.
+- `POST /admin/merchants`: campo opcional `gateway` (default `MERCADO_PAGO`).
+- `POST /webhooks/pagar-me/{merchantId}`: webhook do Pagar.me (resposta `{"status":"received"}`).

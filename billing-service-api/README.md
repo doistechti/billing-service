@@ -425,3 +425,11 @@ Com Colima, aponte o Testcontainers para o socket:
 DOCKER_HOST=unix://$HOME/.colima/default/docker.sock \
 TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock ./mvnw test
 ```
+
+## Gateways e documentação
+
+- Gateways suportados: Mercado Pago (padrão) e Pagar.me (em implementação, por merchant).
+- A mudança multigateway está documentada em [`../billing-service-sdd/10-integracao-pagar-me.md`](../billing-service-sdd/10-integracao-pagar-me.md),
+  com a regra de compatibilidade com os sistemas clientes e o andamento por passo.
+- Os links absolutos acima para `/Users/doistechti/Projetos/DOISTECH/...` estão desatualizados; os arquivos
+  equivalentes estão neste repositório em `docs/` e `src/main/resources/`.

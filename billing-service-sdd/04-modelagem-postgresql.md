@@ -159,3 +159,14 @@ invoices 1:N payments
 Na POC, uma invoice terá apenas uma charge ativa.
 
 No futuro, poderá ter múltiplas tentativas de cobrança.
+
+## Atualização — migration V4 (SDD 10)
+
+Só adiciona colunas à tabela `merchants`; nada é renomeado ou removido (as colunas `mp_*` seguem como estão):
+
+- `gateway varchar(50) not null default 'MERCADO_PAGO'`
+- `pm_secret_key_encrypted text`, `pm_public_key text`, `pm_webhook_secret_encrypted text`
+- `pm_account_id varchar(60)`, `pm_account_name varchar(120)`, `pm_verified_at timestamp`
+
+`charges.gateway` e `payments.gateway` já são `varchar(50)` e passam a aceitar `PAGAR_ME`.
+`ChargeStatus` e `InvoiceStatus` não mudam. Ver [SDD 10](10-integracao-pagar-me.md).

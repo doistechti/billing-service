@@ -91,3 +91,8 @@ externalReference = FECHAMENTO-CLIENTE-55-2026-07-1
 Se o Mercado Pago enviar o mesmo webhook mais de uma vez, o sistema não deve duplicar pagamentos.
 
 Se a invoice já estiver PAID, o evento deve ser ignorado com segurança.
+
+## Atualização — gateways
+
+As regras desta página valem para qualquer gateway. Os status do gateway são mapeados para os status acima
+pelo mapeador de cada integração. Ver [SDD 10](10-integracao-pagar-me.md).

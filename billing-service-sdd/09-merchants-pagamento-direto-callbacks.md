@@ -158,3 +158,11 @@ X-Billing-Signature: v1=<hex HMAC-SHA256(callbackSecret, timestamp + "." + body)
 - Nenhum segredo tem valor padrão no `application.yml`.
 - `BILLING_ENCRYPTION_KEY` (32 bytes em Base64) é obrigatória.
 - Comparação de chaves em tempo constante.
+
+## Atualização — gateway por merchant (SDD 10)
+
+Cada merchant passa a ter um `gateway` (`MERCADO_PAGO` por padrão, ou `PAGAR_ME`). Os merchants existentes,
+incluindo o `legacy`, continuam `MERCADO_PAGO`. O isolamento por merchant, os callbacks, a idempotência e o
+envelope assinado valem igualmente para os dois gateways.
+
+Uso previsto: um merchant Pagar.me por curso livre do Mater Ecclesiae. Ver [SDD 10](10-integracao-pagar-me.md).

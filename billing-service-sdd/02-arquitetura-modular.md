@@ -99,3 +99,12 @@ O billing-service retorna:
 O sistema cliente não deve conhecer detalhes do Mercado Pago.
 
 O sistema cliente apenas sabe que existe uma fatura e um link de pagamento.
+
+## Atualização — multigateway (SDD 10)
+
+A interface `PaymentGatewayService` e seus tipos neutros passam a viver no pacote `gateway`, e não mais em
+`gateway/mercadopago`. Cada implementação (`MercadoPagoGatewayService`, `PagarMeGatewayService`) fica no próprio
+subpacote. Um `PaymentGatewayRouter` escolhe a implementação pelo `gateway` do merchant autenticado.
+
+O princípio acima continua valendo: o sistema cliente não conhece detalhes do gateway.
+Ver [SDD 10](10-integracao-pagar-me.md).
