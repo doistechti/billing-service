@@ -193,7 +193,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 5 | `PagarMeGatewayService` (Pix, boleto, cartão, consulta, estorno, cancelamento) + `PagarMeStatusMapper` + mapeamento de status por gateway; testado contra servidor fake, **não contra a API real** (43 testes verdes) | feito |
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + teste ponta a ponta com Pagar.me fake (47 testes verdes) | feito |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants (49 testes verdes) | feito |
-| 8 | Teste de isolamento entre merchants de gateways diferentes | pendente |
+| 8 | Teste de isolamento entre merchants de gateways diferentes (`merchantsOfDifferentGatewaysCannotReachEachOthersData`; validado por mutação: quebrar `getById` faz o teste falhar) (50 testes verdes) | feito |
 | 9 | Rodar `*IntegrationTest` do store-api contra o billing local | pendente |
 | 10 | Roteiro de testes e `pagar-me-development-setup.md` | pendente |
 

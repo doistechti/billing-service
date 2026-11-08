@@ -307,6 +307,116 @@ class PagarMePaymentsIntegrationTest {
         assertThat(response.getBody().path("message").asText()).isEqualTo("this merchant receives through MERCADO_PAGO");
     }
 
+    /**
+     * Isolamento entre merchants de gateways diferentes (SDD 10): A (Pagar.me) é dono dos dados; B (outro Pagar.me)
+     * e C (Mercado Pago) não podem ler, agir, confirmar por webhook nem herdar idempotência ou credenciais de A.
+     */
+    @Test
+    void merchantsOfDifferentGatewaysCannotReachEachOthersData() {
+        String keyA = API_KEY;
+        String keyB = createPagarMeMerchantViaApi("iso-b", "sk_test_iso_b", "pk_test_iso_b", "whsec-b");
+        String keyC = post("/api/admin/merchants", Map.of("code", "iso-c", "name", "Iso C"),
+                Map.of("X-Admin-Key", "admin-key-test")).getBody().path("apiKey").asText();
+        String merchantB = get("/api/merchant", keyB).getBody().path("id").asText();
+
+        // Dados de A: cliente, fatura, cobrança Pix e o pagamento registrado.
+        String customerA = post("/api/customers", Map.of("sourceSystem", "MATER_ECCLESIAE", "externalReference", "ISO-ALUNO",
+                "name", "Aluna A", "email", "a@example.com", "document", "123.456.789-09"),
+                Map.of("X-API-Key", keyA)).getBody().path("id").asText();
+        String invoiceA = createInvoiceFor(keyA, "ISO-INV");
+        JsonNode chargeA = post("/api/charges", Map.of("invoiceId", invoiceA, "gateway", "PAGAR_ME", "method", "PIX"),
+                Map.of("X-API-Key", keyA, "Idempotency-Key", "iso-same-key")).getBody();
+        String chargeIdA = chargeA.path("id").asText();
+        String gatewayChargeA = chargeA.path("gatewayPaymentId").asText();
+        String paymentIdA = get("/api/payments/invoice/" + invoiceA, keyA).getBody().get(0).path("id").asText();
+
+        for (String intruder : List.of(keyB, keyC)) {
+            // Leitura: 404 (ou lista vazia nas buscas por fatura), nunca o dado de A.
+            assertThat(get("/api/customers/" + customerA, intruder).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(get("/api/customers/by-reference?sourceSystem=MATER_ECCLESIAE&externalReference=ISO-ALUNO", intruder)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(get("/api/invoices/" + invoiceA, intruder).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(get("/api/invoices/by-reference?sourceSystem=MATER_ECCLESIAE&externalReference=ISO-INV", intruder)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(get("/api/charges/" + chargeIdA, intruder).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(get("/api/payments/" + paymentIdA, intruder).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertNotVisible(get("/api/charges/invoice/" + invoiceA, intruder));
+            assertNotVisible(get("/api/payments/invoice/" + invoiceA, intruder));
+
+            // Ação: nada de sincronizar, cancelar, estornar, cancelar fatura ou cobrar fatura alheia.
+            Map<String, String> auth = Map.of("X-API-Key", intruder);
+            assertThat(post("/api/charges/" + chargeIdA + "/sync", Map.of(), auth).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(post("/api/charges/" + chargeIdA + "/cancel", Map.of(), auth).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(post("/api/charges/" + chargeIdA + "/refund", Map.of(), auth).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(patch("/api/invoices/" + invoiceA + "/cancel", intruder).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            String ownGateway = intruder.equals(keyB) ? "PAGAR_ME" : "MERCADO_PAGO";
+            assertThat(post("/api/charges", Map.of("invoiceId", invoiceA, "gateway", ownGateway, "method", "PIX"), auth)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+            // A mesma referência externa é livre em outro merchant (a unicidade é por merchant).
+            ResponseEntity<JsonNode> sameReference = post("/api/customers", Map.of("sourceSystem", "MATER_ECCLESIAE",
+                    "externalReference", "ISO-ALUNO", "name", "Outra pessoa", "email", "x@example.com",
+                    "document", "123.456.789-09"), auth);
+            assertThat(sameReference.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(sameReference.getBody().path("id").asText()).isNotEqualTo(customerA);
+        }
+
+        // Nada do que os intrusos tentaram alterou os dados de A.
+        assertThat(get("/api/invoices/" + invoiceA, keyA).getBody().path("status").asText()).isEqualTo("WAITING_PAYMENT");
+        assertThat(get("/api/charges/" + chargeIdA, keyA).getBody().path("status").asText()).isEqualTo("WAITING_PAYMENT");
+
+        // Idempotência por merchant: a mesma chave em B gera a cobrança de B, não devolve a de A.
+        String invoiceB = createInvoiceFor(keyB, "ISO-INV-B");
+        pagarMe.requests.clear();
+        JsonNode chargeB = post("/api/charges", Map.of("invoiceId", invoiceB, "gateway", "PAGAR_ME", "method", "PIX"),
+                Map.of("X-API-Key", keyB, "Idempotency-Key", "iso-same-key")).getBody();
+        assertThat(chargeB.path("id").asText()).isNotEqualTo(chargeIdA);
+        assertThat(chargeB.path("invoiceId").asText()).isEqualTo(invoiceB);
+
+        // Credenciais por merchant: a cobrança de B saiu com a secret key de B, nunca a de A.
+        assertThat(pagarMe.requests.stream().filter(r -> r.method().equals("POST") && r.path().equals("/core/v5/orders")))
+                .singleElement().satisfies(r -> assertThat(r.authorization()).isEqualTo(basic("sk_test_iso_b", "")));
+
+        // Webhook: o segredo de A não abre a rota de B, e um evento sobre a charge de A enviado à rota de B é inócuo.
+        String routeB = "/api/webhooks/pagar-me/" + merchantB;
+        Map<String, Object> eventAboutA = chargeEvent("charge.paid", gatewayChargeA);
+        assertThat(post(routeB + "?token=" + WEBHOOK_SECRET, eventAboutA, Map.of()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        pagarMe.markPaid(gatewayChargeA);
+        assertThat(post(routeB + "?token=whsec-b", eventAboutA, Map.of()).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(get("/api/charges/" + chargeIdA, keyA).getBody().path("status").asText()).isEqualTo("WAITING_PAYMENT");
+        assertThat(get("/api/invoices/" + invoiceA, keyA).getBody().path("status").asText()).isEqualTo("WAITING_PAYMENT");
+
+        // Prova de que a charge só não mudou por causa do isolamento: o webhook de A, com o mesmo evento, confirma.
+        assertThat(post("/api/webhooks/pagar-me/" + merchant.getId() + "?token=" + WEBHOOK_SECRET, eventAboutA, Map.of())
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(get("/api/charges/" + chargeIdA, keyA).getBody().path("status").asText()).isEqualTo("PAID");
+        assertThat(get("/api/charges/" + chargeB.path("id").asText(), keyB).getBody().path("status").asText())
+                .isEqualTo("WAITING_PAYMENT");
+    }
+
+    private void assertNotVisible(ResponseEntity<JsonNode> response) {
+        if (response.getStatusCode().is2xxSuccessful()) {
+            assertThat(response.getBody()).isEmpty();
+        } else {
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private String createPagarMeMerchantViaApi(String code, String secretKey, String publicKey, String webhookSecret) {
+        JsonNode created = post("/api/admin/merchants", Map.of("code", code, "name", code, "gateway", "PAGAR_ME"),
+                Map.of("X-Admin-Key", "admin-key-test")).getBody();
+        String key = created.path("apiKey").asText();
+        assertThat(put("/api/merchant/pagar-me", Map.of("secretKey", secretKey, "publicKey", publicKey,
+                "webhookSecret", webhookSecret), Map.of("X-API-Key", key)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        return key;
+    }
+
+    private ResponseEntity<JsonNode> patch(String path, String apiKey) {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.set("X-API-Key", apiKey);
+        return rest.exchange(path, HttpMethod.PATCH, new HttpEntity<>(httpHeaders), JsonNode.class);
+    }
+
     private String createInvoiceFor(String apiKey, String reference) {
         ResponseEntity<JsonNode> customer = post("/api/customers", Map.of("sourceSystem", "MATER_ECCLESIAE",
                 "externalReference", "ALUNO-" + reference, "name", "Maria Silva", "email", "maria@example.com",
