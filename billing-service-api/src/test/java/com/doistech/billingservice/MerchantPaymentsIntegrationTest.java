@@ -289,6 +289,11 @@ class MerchantPaymentsIntegrationTest {
         assertThat(merchant.path("mercadoPagoConfigured").isBoolean()).isTrue();
         assertThat(merchant.path("sandbox").isBoolean()).isTrue();
         assertThat(merchant.path("webhookSignatureEnabled").isBoolean()).isTrue();
+        // Campos acrescentados pelo SDD 10: só somam; o merchant Mercado Pago segue igual.
+        assertThat(merchant.path("gateway").asText()).isEqualTo("MERCADO_PAGO");
+        assertThat(merchant.path("pagarMeConfigured").asBoolean(true)).isFalse();
+        assertThat(merchant.path("mercadoPagoNotificationUrl").asText()).contains("/api/webhooks/mercado-pago/");
+        assertThat(merchant.path("notificationUrl").asText()).isEqualTo(merchant.path("mercadoPagoNotificationUrl").asText());
 
         ResponseEntity<JsonNode> customerResponse = post("/api/customers", customerBody("CLIENTE-C"), auth(apiKey));
         assertThat(customerResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);

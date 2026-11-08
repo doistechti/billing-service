@@ -3,6 +3,8 @@ package com.doistech.billingservice.api;
 import com.doistech.billingservice.api.BillingApi.CallbackDeliveryResponse;
 import com.doistech.billingservice.api.MerchantApi.MerchantPublicConfigResponse;
 import com.doistech.billingservice.api.MerchantApi.UpdateOwnMercadoPagoRequest;
+import com.doistech.billingservice.api.MerchantApi.UpdateOwnPagarMeRequest;
+import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.callback.CallbackDelivery;
 import com.doistech.billingservice.callback.CallbackQueue;
 import com.doistech.billingservice.callback.CallbackStatus;
@@ -54,7 +56,20 @@ public class MerchantController {
                 request.publicKey(), request.webhookSecret(), request.sandbox()));
     }
 
+    @PutMapping("/api/merchant/pagar-me")
+    @Operation(summary = "Cadastrar credenciais Pagar.me", description = """
+            Autoatendimento do merchant com gateway PAGAR_ME: valida a secret key no Pagar.me e salva cifrada.
+            Merchant de outro gateway recebe 400. Cadastre em Pagar.me o webhook em notificationUrl, com o
+            webhookSecret como senha do Basic auth ou como ?token=.""")
+    public MerchantPublicConfigResponse updatePagarMe(
+            @AuthenticationPrincipal AuthenticatedMerchant authenticated,
+            @Valid @RequestBody UpdateOwnPagarMeRequest request) {
+        return toConfig(merchantService.updateOwnPagarMe(authenticated.id(), request.secretKey(),
+                request.publicKey(), request.webhookSecret(), request.sandbox()));
+    }
+
     private MerchantPublicConfigResponse toConfig(Merchant merchant) {
+        boolean pagarMe = merchant.getGateway() == Gateway.PAGAR_ME;
         return new MerchantPublicConfigResponse(
                 merchant.getId(),
                 merchant.getCode(),
@@ -63,11 +78,18 @@ public class MerchantController {
                 merchant.isSandbox(),
                 merchant.getCallbackUrl() != null,
                 merchant.getMercadoPagoAccessTokenEncrypted() != null,
-                merchant.getMercadoPagoWebhookSecretEncrypted() != null,
-                merchantService.notificationUrl(merchant),
+                pagarMe ? merchant.getPagarMeWebhookSecretEncrypted() != null
+                        : merchant.getMercadoPagoWebhookSecretEncrypted() != null,
+                pagarMe ? null : merchantService.notificationUrl(merchant),
                 merchant.getMercadoPagoAccountId(),
                 merchant.getMercadoPagoAccountNickname(),
-                merchant.getMercadoPagoVerifiedAt());
+                merchant.getMercadoPagoVerifiedAt(),
+                merchant.getGateway(),
+                merchant.getPagarMeSecretKeyEncrypted() != null,
+                merchant.getPagarMePublicKey(),
+                merchant.getPagarMeAccountName(),
+                merchant.getPagarMeVerifiedAt(),
+                merchantService.notificationUrl(merchant));
     }
 
     @GetMapping("/api/callbacks")

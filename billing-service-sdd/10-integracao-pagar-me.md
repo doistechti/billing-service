@@ -130,19 +130,40 @@ Cartão: o navegador tokeniza com a public key (`pk_…`) e envia só o `token`.
 
 ### 5. Autoatendimento
 
+Fluxo de um curso: o **admin da plataforma** cria o merchant com `gateway: PAGAR_ME` e entrega a API key ao curso;
+o **admin do curso** cadastra a conta Pagar.me dele com `PUT /api/merchant/pagar-me`; só então o merchant cobra.
+
+`POST /api/admin/merchants` aceita `gateway` opcional (default `MERCADO_PAGO`). Merchant `PAGAR_ME` não aceita
+credenciais do Mercado Pago na criação (400). O gateway não muda depois de criado.
+
 `PUT /api/merchant/pagar-me` (X-API-Key do merchant), espelho do `PUT /api/merchant/mercado-pago`:
 
 ```json
-{ "secretKey": "sk_…", "publicKey": "pk_…", "webhookSecret": "…", "sandbox": null }
+{ "secretKey": "sk_test_…", "publicKey": "pk_test_…", "webhookSecret": "…", "sandbox": null }
 ```
 
-Regras: `secretKey` obrigatória no primeiro cadastro, vazia depois mantém a atual; validada na API; segredos
-nunca voltam na resposta; só vale para merchant com `gateway = PAGAR_ME`.
+1. `secretKey` é obrigatória no primeiro cadastro; vazia depois mantém a atual. `webhookSecret` vazio mantém o atual.
+2. `publicKey` é sempre obrigatória. Prefixos `sk_` e `pk_`; `sk_test_` exige `pk_test_` (e vice-versa). 400 se inválido.
+3. A secret key é validada no Pagar.me (`GET /customers?size=1`); recusada → 400 `pagar.me rejected the secret key`.
+   Falha transitória → 502 e nada é salvo. A verificação grava `pm_verified_at`.
+4. `sandbox` sem valor é deduzido do prefixo `sk_test_`.
+5. Segredos nunca voltam na resposta. Merchant de outro gateway (inclusive o `legacy`) → 400
+   `this merchant receives through MERCADO_PAGO`. O inverso também vale: merchant Pagar.me não aceita
+   `PUT /api/merchant/mercado-pago`.
+6. O webhook cadastrado no Pagar.me é o `notificationUrl` devolvido, com o `webhookSecret` como senha do Basic auth da URL
+   ou `?token=<segredo>`.
 
-`GET /api/merchant` ganha, **sem alterar os campos atuais**: `gateway`, `pagarMeConfigured`,
-`pagarMePublicKey`, `pagarMeAccountName`.
+Respostas de `GET /api/merchant` e do admin de merchants ganham, **sem alterar os campos atuais**:
 
-`POST /api/admin/merchants` aceita `gateway` opcional (default `MERCADO_PAGO`). Resposta continua a mesma.
+| Campo novo | Significado |
+|---|---|
+| `gateway` | `MERCADO_PAGO` ou `PAGAR_ME` |
+| `pagarMeConfigured`, `pagarMePublicKey` | credenciais Pagar.me cadastradas |
+| `pagarMeAccountName`, `pagarMeVerifiedAt` | só no `GET /api/merchant`; a v5 não devolve nome de conta, então fica nulo |
+| `notificationUrl` | URL de webhook do gateway do merchant |
+
+Mudanças de leitura, restritas a merchant `PAGAR_ME` (merchants Mercado Pago ficam idênticos):
+`mercadoPagoNotificationUrl` vem `null` (use `notificationUrl`) e `webhookSignatureEnabled` reflete o segredo do webhook do Pagar.me.
 
 ### 6. Integração futura com o Mater (fora desta entrega)
 
@@ -171,7 +192,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter`; `ChargeService`, webhook e `MerchantService` já usam o gateway do merchant (26 testes verdes) | feito |
 | 5 | `PagarMeGatewayService` (Pix, boleto, cartão, consulta, estorno, cancelamento) + `PagarMeStatusMapper` + mapeamento de status por gateway; testado contra servidor fake, **não contra a API real** (43 testes verdes) | feito |
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + teste ponta a ponta com Pagar.me fake (47 testes verdes) | feito |
-| 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants | pendente |
+| 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants (49 testes verdes) | feito |
 | 8 | Teste de isolamento entre merchants de gateways diferentes | pendente |
 | 9 | Rodar `*IntegrationTest` do store-api contra o billing local | pendente |
 | 10 | Roteiro de testes e `pagar-me-development-setup.md` | pendente |

@@ -27,7 +27,7 @@ public class MerchantService {
     private final MerchantRepository merchantRepository;
     private final SecretCipher cipher;
     private final MercadoPagoProperties mercadoPagoProperties;
-    private final java.util.function.Function<String, GatewayAccount> accountVerifier;
+    private final java.util.function.BiFunction<Gateway, String, GatewayAccount> accountVerifier;
 
     public MerchantService(
             MerchantRepository merchantRepository,
@@ -38,14 +38,16 @@ public class MerchantService {
         this.merchantRepository = merchantRepository;
         this.cipher = cipher;
         this.mercadoPagoProperties = mercadoPagoProperties;
-        this.accountVerifier = token -> {
+        this.accountVerifier = (gateway, token) -> {
             try {
-                return gatewayRouter.forGateway(Gateway.MERCADO_PAGO).verifyAccount(token);
+                return gatewayRouter.forGateway(gateway).verifyAccount(token);
             } catch (GatewayIntegrationException exception) {
                 if (exception.isTransient()) {
                     throw exception;
                 }
-                throw new BusinessRuleException("mercado pago rejected the access token");
+                throw new BusinessRuleException(gateway == Gateway.PAGAR_ME
+                        ? "pagar.me rejected the secret key"
+                        : "mercado pago rejected the access token");
             }
         };
     }
@@ -68,6 +70,13 @@ public class MerchantService {
         Merchant merchant = new Merchant();
         merchant.setCode(request.code());
         merchant.setName(request.name());
+        Gateway gateway = request.gateway() == null ? Gateway.MERCADO_PAGO : request.gateway();
+        if (gateway == Gateway.PAGAR_ME && (StringUtils.hasText(request.mercadoPagoAccessToken())
+                || StringUtils.hasText(request.mercadoPagoPublicKey())
+                || StringUtils.hasText(request.mercadoPagoWebhookSecret()))) {
+            throw new BusinessRuleException("mercado pago credentials cannot be set on a pagar.me merchant");
+        }
+        merchant.setGateway(gateway);
         merchant.setMercadoPagoAccessTokenEncrypted(encryptOrNull(request.mercadoPagoAccessToken()));
         merchant.setMercadoPagoPublicKey(blankToNull(request.mercadoPagoPublicKey()));
         merchant.setMercadoPagoWebhookSecretEncrypted(encryptOrNull(request.mercadoPagoWebhookSecret()));
@@ -118,6 +127,9 @@ public class MerchantService {
         if (merchant.isLegacy()) {
             throw new BusinessRuleException("legacy merchant credentials are managed by environment variables");
         }
+        if (merchant.getGateway() != Gateway.MERCADO_PAGO) {
+            throw new BusinessRuleException("this merchant receives through " + merchant.getGateway());
+        }
         boolean newToken = StringUtils.hasText(accessToken);
         if (!newToken && merchant.getMercadoPagoAccessTokenEncrypted() == null) {
             throw new BusinessRuleException("mercado pago access token is required");
@@ -131,7 +143,7 @@ public class MerchantService {
         if (tokenIsTest != keyIsTest) {
             throw new BusinessRuleException("access token and public key must both be test or both be production credentials");
         }
-        GatewayAccount account = accountVerifier.apply(token);
+        GatewayAccount account = accountVerifier.apply(Gateway.MERCADO_PAGO, token);
         if (newToken) {
             merchant.setMercadoPagoAccessTokenEncrypted(cipher.encrypt(token));
         }
@@ -141,6 +153,50 @@ public class MerchantService {
         }
         merchant.setSandbox(sandbox != null ? sandbox : tokenIsTest);
         merchant.markMercadoPagoVerified(account.id(), account.nickname(), java.time.LocalDateTime.now());
+        return merchantRepository.save(merchant);
+    }
+
+    /**
+     * Autoatendimento: o próprio merchant Pagar.me cadastra as credenciais. A secret key é validada no Pagar.me antes
+     * de salvar; secret key e segredo do webhook vazios mantêm o valor atual. Prefixos {@code sk_}/{@code pk_} e
+     * {@code _test_} seguem as chaves v5 do Pagar.me (a confirmar, ver SDD 10).
+     */
+    @Transactional
+    public Merchant updateOwnPagarMe(UUID merchantId, String secretKey, String publicKey, String webhookSecret,
+                                     Boolean sandbox) {
+        Merchant merchant = getById(merchantId);
+        if (merchant.getGateway() != Gateway.PAGAR_ME) {
+            throw new BusinessRuleException("this merchant receives through " + merchant.getGateway());
+        }
+        boolean newKey = StringUtils.hasText(secretKey);
+        if (!newKey && merchant.getPagarMeSecretKeyEncrypted() == null) {
+            throw new BusinessRuleException("pagar.me secret key is required");
+        }
+        if (!StringUtils.hasText(publicKey)) {
+            throw new BusinessRuleException("pagar.me public key is required");
+        }
+        String key = newKey ? secretKey.trim() : cipher.decrypt(merchant.getPagarMeSecretKeyEncrypted());
+        String pub = publicKey.trim();
+        if (!key.startsWith("sk_")) {
+            throw new BusinessRuleException("pagar.me secret key must start with sk_");
+        }
+        if (!pub.startsWith("pk_")) {
+            throw new BusinessRuleException("pagar.me public key must start with pk_");
+        }
+        boolean keyIsTest = key.startsWith("sk_test_");
+        if (keyIsTest != pub.startsWith("pk_test_")) {
+            throw new BusinessRuleException("secret key and public key must both be test or both be production credentials");
+        }
+        GatewayAccount account = accountVerifier.apply(Gateway.PAGAR_ME, key);
+        if (newKey) {
+            merchant.setPagarMeSecretKeyEncrypted(cipher.encrypt(key));
+        }
+        merchant.setPagarMePublicKey(pub);
+        if (StringUtils.hasText(webhookSecret)) {
+            merchant.setPagarMeWebhookSecretEncrypted(cipher.encrypt(webhookSecret.trim()));
+        }
+        merchant.setSandbox(sandbox != null ? sandbox : keyIsTest);
+        merchant.markPagarMeVerified(account.id(), account.nickname(), java.time.LocalDateTime.now());
         return merchantRepository.save(merchant);
     }
 

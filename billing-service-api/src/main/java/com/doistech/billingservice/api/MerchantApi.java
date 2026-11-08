@@ -1,5 +1,6 @@
 package com.doistech.billingservice.api;
 
+import com.doistech.billingservice.core.payment.Gateway;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -29,7 +30,10 @@ public final class MerchantApi {
             @Schema(description = "Usa sandbox_init_point no Checkout Pro.", nullable = true)
             Boolean sandbox,
             @Schema(description = "URL que recebe os callbacks de status.", example = "https://api.loja.com/webhooks/billing", nullable = true)
-            @Pattern(regexp = "https?://.+", message = "callbackUrl must be an http(s) url") String callbackUrl
+            @Pattern(regexp = "https?://.+", message = "callbackUrl must be an http(s) url") String callbackUrl,
+            @Schema(description = "Gateway que o merchant usa para receber. Sem valor: MERCADO_PAGO. "
+                    + "Credenciais Pagar.me são cadastradas pelo próprio merchant em PUT /api/merchant/pagar-me.", nullable = true)
+            Gateway gateway
     ) {
     }
 
@@ -60,7 +64,12 @@ public final class MerchantApi {
             @Schema(description = "URL a cadastrar no painel do Mercado Pago como notificação de webhooks.")
             String mercadoPagoNotificationUrl,
             boolean active,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            Gateway gateway,
+            boolean pagarMeConfigured,
+            String pagarMePublicKey,
+            @Schema(description = "URL de notificação do gateway do merchant (Mercado Pago ou Pagar.me).")
+            String notificationUrl
     ) {
     }
 
@@ -93,7 +102,19 @@ public final class MerchantApi {
             @Schema(nullable = true)
             String mercadoPagoAccountNickname,
             @Schema(nullable = true)
-            LocalDateTime mercadoPagoVerifiedAt
+            LocalDateTime mercadoPagoVerifiedAt,
+            @Schema(description = "Gateway do merchant. Define qual par de credenciais vale.")
+            Gateway gateway,
+            @Schema(description = "Secret key do Pagar.me cadastrada.")
+            boolean pagarMeConfigured,
+            @Schema(description = "Public key do Pagar.me (tokenização de cartão no navegador).", nullable = true)
+            String pagarMePublicKey,
+            @Schema(nullable = true)
+            String pagarMeAccountName,
+            @Schema(nullable = true)
+            LocalDateTime pagarMeVerifiedAt,
+            @Schema(description = "URL de notificação a cadastrar no painel do gateway do merchant.")
+            String notificationUrl
     ) {
     }
 
@@ -112,6 +133,24 @@ public final class MerchantApi {
         @Override
         public String toString() {
             return "UpdateOwnMercadoPagoRequest[publicKey=%s, sandbox=%s]".formatted(publicKey, sandbox);
+        }
+    }
+
+    @Schema(name = "UpdateOwnPagarMeRequest",
+            description = "Credenciais Pagar.me do próprio merchant. secretKey/webhookSecret vazios mantêm o valor atual.")
+    public record UpdateOwnPagarMeRequest(
+            @Schema(description = "Secret key (sk_test_… teste ou sk_… produção). Obrigatória no primeiro cadastro.", nullable = true)
+            String secretKey,
+            @Schema(description = "Public key correspondente (pk_test_… ou pk_…).") @NotBlank(message = "publicKey is required") String publicKey,
+            @Schema(description = "Segredo que autentica os webhooks: use como senha do Basic auth da URL ou como ?token=.", nullable = true)
+            String webhookSecret,
+            @Schema(description = "Sem valor: deduzido do prefixo sk_test_ da secret key.", nullable = true)
+            Boolean sandbox
+    ) {
+
+        @Override
+        public String toString() {
+            return "UpdateOwnPagarMeRequest[publicKey=%s, sandbox=%s]".formatted(publicKey, sandbox);
         }
     }
 }

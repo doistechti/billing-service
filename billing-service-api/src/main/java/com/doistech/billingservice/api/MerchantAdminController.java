@@ -77,6 +77,7 @@ public class MerchantAdminController {
     }
 
     private MerchantResponse toResponse(Merchant merchant) {
+        boolean pagarMe = merchant.getGateway() == com.doistech.billingservice.core.payment.Gateway.PAGAR_ME;
         return new MerchantResponse(
                 merchant.getId(),
                 merchant.getCode(),
@@ -84,11 +85,16 @@ public class MerchantAdminController {
                 merchant.getApiKeyPrefix(),
                 merchant.getMercadoPagoAccessTokenEncrypted() != null,
                 merchant.getMercadoPagoPublicKey(),
-                merchant.getMercadoPagoWebhookSecretEncrypted() != null,
+                pagarMe ? merchant.getPagarMeWebhookSecretEncrypted() != null
+                        : merchant.getMercadoPagoWebhookSecretEncrypted() != null,
                 merchant.isSandbox(),
                 merchant.getCallbackUrl(),
-                merchantService.notificationUrl(merchant),
+                pagarMe ? null : merchantService.notificationUrl(merchant),
                 merchant.isActive(),
-                merchant.getCreatedAt());
+                merchant.getCreatedAt(),
+                merchant.getGateway(),
+                merchant.getPagarMeSecretKeyEncrypted() != null,
+                merchant.getPagarMePublicKey(),
+                merchantService.notificationUrl(merchant));
     }
 }

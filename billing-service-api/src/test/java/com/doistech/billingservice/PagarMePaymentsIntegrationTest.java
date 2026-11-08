@@ -218,6 +218,122 @@ class PagarMePaymentsIntegrationTest {
                 Map.of("type", "charge.paid"), Map.of()).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    @Test
+    void adminCreatesPagarMeMerchantAndItRegistersItsOwnCredentialsThenCharges() {
+        ResponseEntity<JsonNode> mixed = post("/api/admin/merchants", Map.of("code", "curso-misto", "name", "Misto",
+                "gateway", "PAGAR_ME", "mercadoPagoAccessToken", "TEST-x"), Map.of("X-Admin-Key", "admin-key-test"));
+        assertThat(mixed.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<JsonNode> created = post("/api/admin/merchants", Map.of("code", "curso-bible", "name", "Curso de Bíblia",
+                "gateway", "PAGAR_ME"), Map.of("X-Admin-Key", "admin-key-test"));
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String key = created.getBody().path("apiKey").asText();
+        JsonNode data = created.getBody().path("merchant");
+        assertThat(data.path("gateway").asText()).isEqualTo("PAGAR_ME");
+        assertThat(data.path("pagarMeConfigured").asBoolean(true)).isFalse();
+        assertThat(data.path("mercadoPagoNotificationUrl").isNull()).isTrue();
+        assertThat(data.path("notificationUrl").asText()).endsWith("/api/webhooks/pagar-me/" + data.path("id").asText());
+
+        Map<String, String> auth = Map.of("X-API-Key", key);
+        // Sem credenciais ainda: cobrar não é possível.
+        String invoiceId = createInvoiceFor(key, "INSC-S1");
+        assertThat(post("/api/charges", Map.of("invoiceId", invoiceId, "gateway", "PAGAR_ME", "method", "PIX"), auth)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // Validações locais antes de chamar o Pagar.me.
+        assertThat(put("/api/merchant/pagar-me", Map.of("publicKey", "pk_test_x"), auth).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST); // sem secret key no primeiro cadastro
+        assertThat(put("/api/merchant/pagar-me", Map.of("secretKey", "abc", "publicKey", "pk_test_x"), auth).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST); // prefixo
+        assertThat(put("/api/merchant/pagar-me", Map.of("secretKey", "sk_test_ok", "publicKey", "pk_live"), auth)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST); // ambientes misturados
+        assertThat(put("/api/merchant/pagar-me", Map.of("secretKey", "sk_test_ok"), auth).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST); // sem public key
+        int callsBeforeVerification = pagarMe.requests.size();
+
+        // Chave recusada pelo Pagar.me.
+        ResponseEntity<JsonNode> rejected = put("/api/merchant/pagar-me",
+                Map.of("secretKey", "sk_test_bad", "publicKey", "pk_test_x"), auth);
+        assertThat(rejected.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(rejected.getBody().path("message").asText()).isEqualTo("pagar.me rejected the secret key");
+        assertThat(get("/api/merchant", key).getBody().path("pagarMeConfigured").asBoolean(true)).isFalse();
+
+        // Cadastro válido: verificado, cifrado e sem segredos na resposta.
+        ResponseEntity<JsonNode> saved = put("/api/merchant/pagar-me", Map.of("secretKey", "sk_test_curso_bible",
+                "publicKey", "pk_test_curso_bible", "webhookSecret", "whsec-bible"), auth);
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode config = saved.getBody();
+        assertThat(config.path("gateway").asText()).isEqualTo("PAGAR_ME");
+        assertThat(config.path("pagarMeConfigured").asBoolean()).isTrue();
+        assertThat(config.path("pagarMePublicKey").asText()).isEqualTo("pk_test_curso_bible");
+        assertThat(config.path("pagarMeVerifiedAt").isNull()).isFalse();
+        assertThat(config.path("sandbox").asBoolean()).isTrue();
+        assertThat(config.path("webhookSignatureEnabled").asBoolean()).isTrue();
+        assertThat(config.path("mercadoPagoConfigured").asBoolean(true)).isFalse();
+        assertThat(config.path("mercadoPagoNotificationUrl").isNull()).isTrue();
+        assertThat(config.toString()).doesNotContain("sk_test_curso_bible").doesNotContain("whsec-bible");
+        assertThat(pagarMe.requests.subList(callsBeforeVerification, pagarMe.requests.size()))
+                .anyMatch(r -> r.path().equals("/core/v5/customers"));
+
+        // Atualizar só a public key, com a secret key vazia, mantém a chave guardada e a revalida com ela.
+        pagarMe.requests.clear();
+        assertThat(put("/api/merchant/pagar-me", Map.of("publicKey", "pk_test_nova"), auth).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(pagarMe.requests.get(0).authorization()).isEqualTo("Basic " + Base64.getEncoder()
+                .encodeToString("sk_test_curso_bible:".getBytes(StandardCharsets.UTF_8)));
+        assertThat(get("/api/merchant", key).getBody().path("pagarMePublicKey").asText()).isEqualTo("pk_test_nova");
+
+        // Agora cobra.
+        ResponseEntity<JsonNode> charge = post("/api/charges",
+                Map.of("invoiceId", invoiceId, "gateway", "PAGAR_ME", "method", "PIX"), auth);
+        assertThat(charge.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(charge.getBody().path("status").asText()).isEqualTo("WAITING_PAYMENT");
+
+        // Merchant Pagar.me não aceita o cadastro do Mercado Pago.
+        assertThat(put("/api/merchant/mercado-pago", Map.of("accessToken", "TEST-1", "publicKey", "TEST-2"), auth)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void mercadoPagoMerchantCannotRegisterPagarMeCredentials() {
+        ResponseEntity<JsonNode> created = post("/api/admin/merchants", Map.of("code", "loja-mp", "name", "Loja MP"),
+                Map.of("X-Admin-Key", "admin-key-test"));
+        assertThat(created.getBody().path("merchant").path("gateway").asText()).isEqualTo("MERCADO_PAGO");
+
+        ResponseEntity<JsonNode> response = put("/api/merchant/pagar-me",
+                Map.of("secretKey", "sk_test_x", "publicKey", "pk_test_x"), Map.of("X-API-Key", created.getBody().path("apiKey").asText()));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().path("message").asText()).isEqualTo("this merchant receives through MERCADO_PAGO");
+    }
+
+    private String createInvoiceFor(String apiKey, String reference) {
+        ResponseEntity<JsonNode> customer = post("/api/customers", Map.of("sourceSystem", "MATER_ECCLESIAE",
+                "externalReference", "ALUNO-" + reference, "name", "Maria Silva", "email", "maria@example.com",
+                "document", "123.456.789-09"), Map.of("X-API-Key", apiKey));
+        ResponseEntity<JsonNode> invoice = post("/api/invoices", Map.of(
+                "customerId", customer.getBody().path("id").asText(),
+                "sourceSystem", "MATER_ECCLESIAE",
+                "externalReference", reference,
+                "description", "Inscrição " + reference,
+                "items", List.of(Map.of("description", "Curso", "quantity", 1, "unitAmount", 100.00))),
+                Map.of("X-API-Key", apiKey));
+        return invoice.getBody().path("id").asText();
+    }
+
+    private ResponseEntity<JsonNode> put(String path, Object body, Map<String, String> headers) {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.setContentType(MediaType.APPLICATION_JSON);
+        headers.forEach(httpHeaders::set);
+        return rest.exchange(path, HttpMethod.PUT, new HttpEntity<>(body, httpHeaders), JsonNode.class);
+    }
+
+    private ResponseEntity<JsonNode> get(String path, String apiKey) {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.set("X-API-Key", apiKey);
+        return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(httpHeaders), JsonNode.class);
+    }
+
     private Map<String, Object> chargeEvent(String type, String chargeId) {
         return Map.of("id", "hook_1", "type", type, "data", Map.of("id", chargeId, "status", "paid"));
     }
@@ -304,8 +420,21 @@ class PagarMePaymentsIntegrationTest {
             requests.add(new Recorded(method, path, exchange.getRequestHeaders().getFirst("Authorization")));
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 
+            String authorization = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authorization != null && new String(Base64.getDecoder().decode(authorization.substring(6)),
+                    StandardCharsets.UTF_8).startsWith("sk_test_bad")) {
+                byte[] denied = "{\"message\":\"Authorization has been denied for this request.\"}".getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(401, denied.length);
+                exchange.getResponseBody().write(denied);
+                exchange.close();
+                return;
+            }
+
             JsonNode response = null;
-            if ("POST".equals(method) && path.equals("/core/v5/orders")) {
+            if ("GET".equals(method) && path.equals("/core/v5/customers")) {
+                response = json.createObjectNode().set("data", json.createArrayNode());
+            } else if ("POST".equals(method) && path.equals("/core/v5/orders")) {
                 response = createOrder(json.readTree(body));
             } else if ("GET".equals(method) && path.startsWith("/core/v5/charges/")) {
                 response = charges.get(path.substring("/core/v5/charges/".length()));
