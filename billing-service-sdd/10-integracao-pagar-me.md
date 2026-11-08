@@ -79,13 +79,13 @@ API v5, base `https://api.pagar.me/core/v5`, autenticação HTTP Basic com a sec
 
 | Operação do billing | Pagar.me |
 |---|---|
-| `createCharge` (CHECKOUT_PRO equivalente) | `POST /paymentlinks` → `paymentUrl` |
+| `createCharge` (CHECKOUT_PRO equivalente) | **Não suportado nesta entrega.** Responde 400 pedindo PIX, BOLETO ou CREDIT_CARD (ver Pendências, item 8) |
 | `createPayment` PIX | `POST /orders` com `payments[].payment_method = pix` |
 | `createPayment` BOLETO | `POST /orders` com `payment_method = boleto` |
 | `createPayment` CREDIT_CARD | `POST /orders` com `payment_method = credit_card` e `card_token` |
 | `getPayment` | `GET /charges/{id}` |
-| `refund` / `cancelPayment` | `DELETE /charges/{id}` (corpo com `amount` no estorno parcial) |
-| `verifyAccount` | `GET` autenticado simples; falha de autenticação → 400 |
+| `refund` / `cancelPayment` | `DELETE /charges/{id}` (corpo com `amount` em centavos no estorno parcial; sem corpo cancela) |
+| `verifyAccount` | `GET /customers?page=1&size=1` autenticado: prova que a secret key é válida (401 → 400 "invalid secret key"). A v5 não expõe id/nome da conta, então `GatewayAccount` vai vazio |
 
 Mapa de status (`PagarMeStatusMapper`):
 
@@ -97,6 +97,17 @@ canceled              → CANCELED
 refunded              → REFUNDED
 overpaid, underpaid   → tratar como PAID parcial: registrar e sinalizar (decisão em aberto, ver Pendências)
 ```
+
+Detalhes da implementação (passo 5):
+
+- `gatewayPaymentId` é o id da **charge** (`ch_…`); o order criado em `POST /orders` traz a charge em `charges[0]`.
+- O `external_reference` do billing passa de 52 caracteres (limite do campo `code`), então vai em `metadata.external_reference`
+  do order. O webhook localiza a charge primeiro pelo `gatewayPaymentId`; a referência é só plano B.
+- `statusDetail` = status da última transação (`waiting_payment`, `captured`, `not_authorized`, `refunded`…).
+- Horários do Pagar.me vêm em UTC e são convertidos para `America/Sao_Paulo`, que é o fuso gravado pelo billing.
+- Erros 422 devolvem as mensagens por campo (`customer.document: …`); 5xx/429/rede são transitórios (502 para o cliente).
+- Header de idempotência `Idempotency-Key` em todo POST/DELETE (ver Pendências, item 3).
+- `ChargeStatusSynchronizer` passou a usar `GatewayStatusMapper`, que escolhe o mapa pelo gateway do pagamento.
 
 Cartão: o navegador tokeniza com a public key (`pk_…`) e envia só o `token`. Nunca trafega número aberto.
 
@@ -151,7 +162,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 2 | Testes de contrato fixando o JSON atual das rotas usadas pela store (`storeConsumedJsonContractStaysStable`) | feito |
 | 3 | Refatoração: interface e tipos neutros movidos para `gateway`, `MercadoPagoAccount` → `GatewayAccount` (21 testes verdes) | feito |
 | 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter`; `ChargeService`, webhook e `MerchantService` já usam o gateway do merchant (26 testes verdes) | feito |
-| 5 | `PagarMeGatewayService` + `PagarMeStatusMapper` + testes. Inclui tornar o mapeamento de status por gateway: hoje `ChargeStatusSynchronizer` chama `MercadoPagoStatusMapper` direto | pendente |
+| 5 | `PagarMeGatewayService` (Pix, boleto, cartão, consulta, estorno, cancelamento) + `PagarMeStatusMapper` + mapeamento de status por gateway; testado contra servidor fake, **não contra a API real** (43 testes verdes) | feito |
 | 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + testes | pendente |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants | pendente |
 | 8 | Teste de isolamento entre merchants de gateways diferentes | pendente |
@@ -169,6 +180,8 @@ Critério para fechar cada passo: `./mvnw verify` verde e nenhum teste de contra
 5. Endpoint mais adequado para **verificar a conta** no cadastro das credenciais.
 6. Campos obrigatórios do pagador no boleto e no Pix (documento, endereço, telefone).
 7. Credenciais de **sandbox** disponíveis para validar contra a API real.
+8. **Link hospedado** (`/paymentlinks`): como reconciliar o pedido que o link gera com a invoice (metadata, código do pedido ou webhook). Enquanto isso, `CHECKOUT_PRO` não é aceito para merchants Pagar.me.
+9. Status de transação para **estorno e cancelamento** (`refunded`, `voided`, `partial_refunded`, `expired`) e como o Pagar.me representa Pix/boleto vencido.
 
 ## Fora do escopo
 

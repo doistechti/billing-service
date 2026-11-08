@@ -7,7 +7,7 @@ import com.doistech.billingservice.core.invoice.InvoiceStatus;
 import com.doistech.billingservice.core.payment.Payment;
 import com.doistech.billingservice.core.payment.PaymentRepository;
 import com.doistech.billingservice.gateway.GatewayPaymentResponse;
-import com.doistech.billingservice.gateway.mercadopago.MercadoPagoStatusMapper;
+import com.doistech.billingservice.gateway.GatewayStatusMapper;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -67,7 +67,7 @@ public class ChargeStatusSynchronizer {
             upsertPayment(charge, payment);
         }
 
-        ChargeStatus next = MercadoPagoStatusMapper.toChargeStatus(payment.gatewayStatus(), payment.statusDetail());
+        ChargeStatus next = GatewayStatusMapper.toChargeStatus(payment.gateway(), payment.gatewayStatus(), payment.statusDetail());
         ChargeStatus previous = charge.getStatus();
         if (!previous.canTransitionTo(next)) {
             chargeRepository.save(charge);

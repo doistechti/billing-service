@@ -63,3 +63,7 @@ mercado-pago:
   sandbox: ${MERCADO_PAGO_SANDBOX:false}
   webhook-base-url: ${APP_BASE_URL:http://localhost:8080}
   notification-url: ${APP_BASE_URL:http://localhost:8080}/api/webhooks/mercado-pago
+
+pagar-me:
+  # As credenciais (secret key, public key e segredo do webhook) ficam por merchant, cifradas no banco.
+  base-url: ${PAGAR_ME_BASE_URL:https://api.pagar.me/core/v5}
