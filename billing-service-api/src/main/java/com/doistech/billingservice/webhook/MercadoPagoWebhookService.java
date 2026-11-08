@@ -1,9 +1,11 @@
 package com.doistech.billingservice.webhook;
 
 import com.doistech.billingservice.core.merchant.MerchantService;
+import com.doistech.billingservice.core.payment.Gateway;
 import com.doistech.billingservice.gateway.mercadopago.MercadoPagoSignatureVerifier;
 import com.doistech.billingservice.shared.GatewayIntegrationException;
 import com.doistech.billingservice.shared.InvalidSignatureException;
+import com.doistech.billingservice.shared.NotFoundException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +38,9 @@ public class MercadoPagoWebhookService {
      * reenviar; nos demais casos registra o erro e responde normalmente.
      */
     public void receive(UUID merchantId, JsonNode payload, WebhookHeaders headers) {
-        merchantService.getById(merchantId);
+        if (merchantService.getById(merchantId).getGateway() != Gateway.MERCADO_PAGO) {
+            throw new NotFoundException("merchant not found");
+        }
 
         String paymentId = Optional.ofNullable(headers.queryDataId()).orElseGet(() -> extractPaymentId(payload));
         String eventType = firstNonBlank(textAt(payload, "type"), textAt(payload, "topic"), textAt(payload, "action"));
@@ -48,7 +52,7 @@ public class MercadoPagoWebhookService {
             throw new InvalidSignatureException("invalid webhook signature");
         }
 
-        UUID eventRecordId = recorder.record(merchantId, textAt(payload, "id"), eventType, paymentId, payload);
+        UUID eventRecordId = recorder.record(Gateway.MERCADO_PAGO, merchantId, textAt(payload, "id"), eventType, paymentId, payload);
         log.info("mercado pago webhook received merchantId={} eventRecordId={} eventType={} paymentId={}",
                 merchantId, eventRecordId, eventType, paymentId);
 

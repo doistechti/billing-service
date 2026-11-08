@@ -176,4 +176,4 @@ Adições, sem alterar as rotas acima:
 - `PUT /merchant/pagar-me`: cadastro das credenciais Pagar.me pelo próprio merchant.
 - `GET /merchant`: campos novos `gateway`, `pagarMeConfigured`, `pagarMePublicKey`, `pagarMeAccountName`.
 - `POST /admin/merchants`: campo opcional `gateway` (default `MERCADO_PAGO`).
-- `POST /webhooks/pagar-me/{merchantId}`: webhook do Pagar.me (resposta `{"status":"received"}`).
+- `POST /webhooks/pagar-me/{merchantId}`: webhook do Pagar.me (resposta `{"status":"received"}`). Com segredo no merchant, exige `Authorization: Basic` (senha = segredo) ou `?token=`; 401 se inválido; 404 se o merchant não for Pagar.me.

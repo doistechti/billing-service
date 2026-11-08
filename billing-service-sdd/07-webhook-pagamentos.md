@@ -89,5 +89,5 @@ Se a invoice não for encontrada:
 
 O Pagar.me usa rota própria, `POST /api/webhooks/pagar-me/{merchantId}`, com o mesmo processamento deste
 documento: registrar o payload, consultar o pagamento no gateway antes de confirmar e garantir idempotência.
-O mapa de status do Pagar.me e as pendências de validação da assinatura estão no
+Autenticação do envio (segredo do merchant), eventos tratados, mapa de status e pendências de validação da assinatura estão no
 [SDD 10](10-integracao-pagar-me.md). O webhook do Mercado Pago não muda.

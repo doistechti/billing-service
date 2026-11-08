@@ -4,6 +4,7 @@ import com.doistech.billingservice.api.BillingApi.WebhookReceivedResponse;
 import com.doistech.billingservice.core.merchant.Merchant;
 import com.doistech.billingservice.webhook.MercadoPagoWebhookService;
 import com.doistech.billingservice.webhook.MercadoPagoWebhookService.WebhookHeaders;
+import com.doistech.billingservice.webhook.PagarMeWebhookService;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,9 +28,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class WebhookController {
 
     private final MercadoPagoWebhookService mercadoPagoWebhookService;
+    private final PagarMeWebhookService pagarMeWebhookService;
 
-    public WebhookController(MercadoPagoWebhookService mercadoPagoWebhookService) {
+    public WebhookController(
+            MercadoPagoWebhookService mercadoPagoWebhookService,
+            PagarMeWebhookService pagarMeWebhookService) {
         this.mercadoPagoWebhookService = mercadoPagoWebhookService;
+        this.pagarMeWebhookService = pagarMeWebhookService;
     }
 
     @PostMapping("/mercado-pago")
@@ -71,6 +76,27 @@ public class WebhookController {
             @RequestHeader(name = "x-request-id", required = false) String requestId,
             @RequestParam(name = "data.id", required = false) String dataId) {
         mercadoPagoWebhookService.receive(merchantId, payload, new WebhookHeaders(signature, requestId, dataId));
+        return new WebhookReceivedResponse("received");
+    }
+
+    @PostMapping("/pagar-me/{merchantId}")
+    @Operation(summary = "Receber webhook do Pagar.me",
+            description = "Recebe eventos charge.* e order.* do Pagar.me de um merchant. Com webhook secret configurado, exige "
+                    + "Authorization Basic (senha = segredo) ou o parametro token. O payload nunca confirma o pagamento: "
+                    + "a charge e sempre consultada no Pagar.me.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Webhook recebido.",
+                    content = @Content(schema = @Schema(implementation = WebhookReceivedResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Credenciais do webhook invalidas."),
+            @ApiResponse(responseCode = "404", description = "Merchant inexistente ou de outro gateway."),
+            @ApiResponse(responseCode = "502", description = "Falha transitoria ao consultar o gateway; o Pagar.me reenvia.")
+    })
+    public WebhookReceivedResponse pagarMe(
+            @PathVariable UUID merchantId,
+            @RequestBody(required = false) JsonNode payload,
+            @RequestHeader(name = "Authorization", required = false) String authorization,
+            @RequestParam(name = "token", required = false) String token) {
+        pagarMeWebhookService.receive(merchantId, payload, authorization, token);
         return new WebhookReceivedResponse("received");
     }
 }

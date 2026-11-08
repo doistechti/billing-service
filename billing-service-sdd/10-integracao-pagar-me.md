@@ -113,13 +113,20 @@ Cartão: o navegador tokeniza com a public key (`pk_…`) e envia só o `token`.
 
 ### 4. Webhook do Pagar.me
 
-- Rota nova: `POST /api/webhooks/pagar-me/{merchantId}`. Não há rota "legacy" para Pagar.me.
-- Reusa `WebhookEventRecorder` e `WebhookPaymentProcessor`. **Regra mantida:** o payload nunca confirma
-  pagamento; o billing consulta `GET /charges/{id}` antes de atualizar `payments`, `charges` e `invoices`.
-- Eventos tratados: `order.paid`, `charge.paid`, `charge.payment_failed`, `charge.refunded`, `charge.canceled`.
-- Idempotência por `webhook_events` (mesmo contrato do SDD 07).
-- Validação de autenticidade: ver Pendências. Enquanto a validação não estiver confirmada com a documentação
-  oficial, o endpoint exige o segredo do merchant e a confirmação ativa por consulta ao gateway.
+- Rota: `POST /api/webhooks/pagar-me/{merchantId}`. Não há rota "legacy" para Pagar.me. Merchant de outro gateway → 404;
+  a rota do Mercado Pago também responde 404 para merchant Pagar.me.
+- Eventos tratados: `charge.*` (id da charge em `data.id`) e `order.*` (id em `data.charges[0].id`). Qualquer outro
+  tipo (`customer.*`, `subscription.*`…) é registrado em `webhook_events` e ignorado com 200.
+- **O payload nunca confirma pagamento.** O `WebhookPaymentProcessor` consulta `GET /charges/{id}` com a secret key do
+  merchant antes de atualizar `payments`, `charges` e `invoices`. Um evento forjado, no máximo, dispara uma consulta
+  na conta do próprio merchant.
+- **Autenticação do envio** (camada adicional, ver Pendências, item 1): com segredo configurado no merchant
+  (`pm_webhook_secret`), exige `Authorization: Basic` com o segredo na **senha** (qualquer usuário) ou o parâmetro
+  `?token=<segredo>`. Comparação em tempo constante; falha → 401, sem registrar nem consultar. Sem segredo
+  configurado, aceita e registra um aviso; a confirmação por consulta continua valendo.
+- Idempotência: o evento é registrado e o processamento reaplica o estado consultado; reenvio não duplica `payment`
+  nem altera invoice já paga. Falha transitória ao consultar o gateway → 502 para o Pagar.me reenviar.
+- Mesmo envelope de resposta do Mercado Pago: `{"status":"received"}`.
 
 ### 5. Autoatendimento
 
@@ -163,7 +170,7 @@ Opcional: `PAGAR_ME_BASE_URL` (default `https://api.pagar.me/core/v5`), útil pa
 | 3 | Refatoração: interface e tipos neutros movidos para `gateway`, `MercadoPagoAccount` → `GatewayAccount` (21 testes verdes) | feito |
 | 4 | Migration V4 (`merchants.gateway` e colunas `pm_*`) + `PaymentGatewayRouter`; `ChargeService`, webhook e `MerchantService` já usam o gateway do merchant (26 testes verdes) | feito |
 | 5 | `PagarMeGatewayService` (Pix, boleto, cartão, consulta, estorno, cancelamento) + `PagarMeStatusMapper` + mapeamento de status por gateway; testado contra servidor fake, **não contra a API real** (43 testes verdes) | feito |
-| 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + testes | pendente |
+| 6 | Webhook `POST /api/webhooks/pagar-me/{merchantId}` + teste ponta a ponta com Pagar.me fake (47 testes verdes) | feito |
 | 7 | `PUT /api/merchant/pagar-me`, `GET /api/merchant` ampliado, `gateway` no admin de merchants | pendente |
 | 8 | Teste de isolamento entre merchants de gateways diferentes | pendente |
 | 9 | Rodar `*IntegrationTest` do store-api contra o billing local | pendente |
@@ -173,7 +180,7 @@ Critério para fechar cada passo: `./mvnw verify` verde e nenhum teste de contra
 
 ## Pendências de validação (confirmar na documentação oficial do Pagar.me antes de implementar)
 
-1. Esquema de **assinatura/autenticação do webhook** v5 (header, algoritmo e o que entra no HMAC).
+1. Esquema de **assinatura/autenticação do webhook** v5 (header, algoritmo e o que entra no HMAC). Hoje o envio é autenticado pelo segredo do merchant (Basic ou `?token=`); trocar/complementar por assinatura oficial quando confirmada.
 2. Comportamento de `overpaid` e `underpaid`: como mapear para `ChargeStatus`.
 3. Suporte e nome do header de **idempotência** na v5 (`Idempotency-Key`).
 4. Endpoint e campos exatos de **tokenização** de cartão no navegador com a public key.

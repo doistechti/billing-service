@@ -21,10 +21,10 @@ public class WebhookEventRecorder {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public UUID record(UUID merchantId, String eventId, String eventType, String paymentId, JsonNode payload) {
+    public UUID record(Gateway gateway, UUID merchantId, String eventId, String eventType, String paymentId, JsonNode payload) {
         WebhookEvent event = new WebhookEvent();
         event.setMerchantId(merchantId);
-        event.setGateway(Gateway.MERCADO_PAGO);
+        event.setGateway(gateway);
         event.setEventId(eventId);
         event.setEventType(eventType);
         event.setGatewayPaymentId(paymentId);
