@@ -99,6 +99,11 @@ public class PagarMeGatewayService implements PaymentGatewayService {
         GatewayPaymentResponse payment = toPaymentResponse(charge, response);
         log.info("pagar.me charge created chargeId={} status={} statusDetail={}",
                 payment.gatewayPaymentId(), payment.gatewayStatus(), payment.statusDetail());
+        if ("failed".equalsIgnoreCase(payment.gatewayStatus())) {
+            // Motivo da recusa (gateway_response.errors); sem dados de cartão, só mensagens do Pagar.me.
+            log.warn("pagar.me charge failed chargeId={} gatewayResponse={}", payment.gatewayPaymentId(),
+                    charge.path("last_transaction").path("gateway_response").toString());
+        }
         return payment;
     }
 
