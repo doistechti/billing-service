@@ -226,6 +226,21 @@ Critério para fechar cada passo: `./mvnw verify` verde e nenhum teste de contra
 8. **Link hospedado** (`/paymentlinks`): como reconciliar o pedido que o link gera com a invoice (metadata, código do pedido ou webhook). Enquanto isso, `CHECKOUT_PRO` não é aceito para merchants Pagar.me.
 9. Status de transação para **estorno e cancelamento** (`refunded`, `voided`, `partial_refunded`, `expired`) e como o Pagar.me representa Pix/boleto vencido.
 
+## Conferência na documentação oficial e em produção (2026-11-14)
+
+Itens das pendências acima verificados contra docs.pagar.me e contra a API real:
+
+| # | Item | Resultado |
+|---|---|---|
+| 6 | Campos do pagador no Pix | **Confirmado.** O customer precisa de `name`, `email`, `document` e **`phones`**; sem telefone o Pagar.me aceita o pedido mas devolve a charge `failed` com `gateway_response.errors[0].message = "At least one customer phone is required."` (visto em produção). O billing passou a enviar `phones.mobile_phone` (`country_code` 55, `area_code`, `number`) a partir de `payer.phone` ou do telefone do customer. `PayerRequest.phone` é opcional (10 a 13 dígitos). |
+| 3 | Pix e expiração | `pix.expires_in` é **obrigatório** e em **segundos** (ou `expires_at`); o billing envia `expires_in` com mínimo de 60 s. No link de pagamento a unidade é minutos, não confundir. |
+| 4 | Tokenização de cartão | `POST` do navegador com a **public key** em `appId` na query, **sem** header `Authorization` (só `Content-Type`); corpo `{ "type": "card", "card": {...} }`; resposta com `id` `token_…`, válido por **60 s** e de **uso único**; o token vai em `credit_card.card_token`. **O domínio precisa estar cadastrado no painel do Pagar.me**: em multiloja com domínio próprio, cada domínio da vitrine entra nesse cadastro. Ainda por validar contra a API real. |
+| 1 | Assinatura do webhook v5 | **Não confirmado.** A documentação encontrada descreve o esquema antigo (HMAC-SHA1 do corpo com a API key, header `X-Hub-Signature`, prefixo `sha1=`); não achei a página da v5. Mantido o segredo por merchant na URL (`?token=`) e a consulta ativa da charge antes de confirmar pagamento. |
+| 8 | Link hospedado | Segue sem suporte (Checkout Pro não existe no Pagar.me do billing). |
+
+Efeito observado em produção: charge `failed` vira `REJECTED` no billing; o `statusDetail` continua `failed` (usado pelo
+mapeador de status) e o motivo passou a sair no log `pagar.me charge failed ... gatewayResponse=...`.
+
 ## Fora do escopo
 
 - Recorrência/assinatura do Pagar.me, split de pagamento e marketplace/recebedores.

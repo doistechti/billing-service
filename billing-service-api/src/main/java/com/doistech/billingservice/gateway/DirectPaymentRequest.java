@@ -21,8 +21,14 @@ public record DirectPaymentRequest(
             String lastName,
             String documentType,
             String documentNumber,
-            Address address
+            Address address,
+            String phone
     ) {
+
+        /** Compatibilidade: pagador sem telefone. */
+        public Payer(String email, String firstName, String lastName, String documentType, String documentNumber, Address address) {
+            this(email, firstName, lastName, documentType, documentNumber, address, null);
+        }
     }
 
     public record Address(

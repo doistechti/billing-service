@@ -167,8 +167,16 @@ public final class BillingApi {
             @Schema(description = "CPF ou CNPJ, apenas dígitos.", example = "12345678909", nullable = true)
             @Pattern(regexp = "\\d{11}|\\d{14}", message = "payer document must have 11 or 14 digits") String document,
             @Schema(description = "Endereço. Obrigatório para BOLETO.", nullable = true)
-            @Valid AddressRequest address
+            @Valid AddressRequest address,
+            @Schema(description = "Telefone com DDD, apenas dígitos (10 a 13, com ou sem 55). Obrigatório no Pagar.me; ausente usa o do customer.",
+                    example = "21991017888", nullable = true)
+            @Pattern(regexp = "\\d{10,13}", message = "payer phone must have 10 to 13 digits") String phone
     ) {
+
+        /** Compatibilidade: pagador sem telefone. */
+        public PayerRequest(String name, String email, String document, AddressRequest address) {
+            this(name, email, document, address, null);
+        }
     }
 
     @Schema(name = "AddressRequest", description = "Endereço do pagador.")

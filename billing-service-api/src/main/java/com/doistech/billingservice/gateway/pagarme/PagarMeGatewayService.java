@@ -191,6 +191,10 @@ public class PagarMeGatewayService implements PaymentGatewayService {
             customer.put("document_type", company ? "CNPJ" : "CPF");
             customer.put("type", company ? "company" : "individual");
         }
+        Map<String, Object> phones = phones(payer.phone());
+        if (phones != null) {
+            customer.put("phones", phones);
+        }
         if (includeAddress && payer.address() != null) {
             DirectPaymentRequest.Address address = payer.address();
             Map<String, Object> value = new LinkedHashMap<>();
@@ -202,6 +206,30 @@ public class PagarMeGatewayService implements PaymentGatewayService {
             customer.put("address", value);
         }
         return customer;
+    }
+
+    /**
+     * Telefone do pagador no formato da v5 ({@code phones.mobile_phone}): o Pagar.me recusa a cobrança sem ao menos um
+     * ("At least one customer phone is required."). Aceita 10 a 13 dígitos, com ou sem o 55 do país.
+     */
+    static Map<String, Object> phones(String raw) {
+        String digits = digitsOnly(raw);
+        if (!StringUtils.hasText(digits)) {
+            return null;
+        }
+        if (digits.length() > 11 && digits.startsWith("55")) {
+            digits = digits.substring(2);
+        }
+        if (digits.length() < 10 || digits.length() > 11) {
+            return null;
+        }
+        Map<String, Object> mobile = new LinkedHashMap<>();
+        mobile.put("country_code", "55");
+        mobile.put("area_code", digits.substring(0, 2));
+        mobile.put("number", digits.substring(2));
+        Map<String, Object> phones = new LinkedHashMap<>();
+        phones.put("mobile_phone", mobile);
+        return phones;
     }
 
     private GatewayPaymentResponse toPaymentResponse(JsonNode charge, JsonNode order) {

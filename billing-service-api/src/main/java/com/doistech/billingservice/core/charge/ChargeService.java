@@ -244,7 +244,8 @@ public class ChargeService {
                         nameParts[1],
                         document.length() == 11 ? "CPF" : "CNPJ",
                         document,
-                        mpAddress),
+                        mpAddress,
+                        onlyDigits(firstText(payer == null ? null : payer.phone(), customer.getPhone()))),
                 card);
     }
 
