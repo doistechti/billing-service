@@ -171,8 +171,8 @@ Response:
 
 Adições, sem alterar as rotas acima:
 
-- `POST /charges`: o campo `gateway` aceita também `PAGAR_ME`. Se omitido, vale o gateway do merchant.
-  Valor diferente do gateway do merchant → 400 (`gateway mismatch`).
+- `POST /charges`: o campo `gateway` (obrigatório, como antes) aceita também `PAGAR_ME`. Omitido → 400 (`gateway is required`).
+  Valor diferente do gateway do merchant → 400 (`gateway mismatch`). Ver SDD 10.
 - `PUT /merchant/pagar-me`: cadastro das credenciais Pagar.me pelo próprio merchant (`secretKey`, `publicKey`, `webhookSecret`, `sandbox`).
 - `GET /merchant`: campos novos `gateway`, `pagarMeConfigured`, `pagarMePublicKey`, `pagarMeAccountName`.
 - `POST /admin/merchants`: campo opcional `gateway` (default `MERCADO_PAGO`).

@@ -125,7 +125,7 @@ jq -n --arg i "$INVOICE_ID" '{invoiceId:$i, gateway:"PAGAR_ME", method:"PIX"}' \
 | `CREDIT_CARD` | `card.token` (tokenizado no navegador com a **public key**) e `card.installments` | status síncrono (`PAID` ou `REJECTED`) |
 
 **Não existe link hospedado** para Pagar.me ainda: `POST /api/charges` sem `method` responde 400 pedindo PIX, BOLETO ou
-CREDIT_CARD (pendência 8). `gateway` precisa ser `PAGAR_ME`; outro valor responde 400 `gateway mismatch`.
+CREDIT_CARD (pendência 8). `gateway` é **obrigatório** e precisa ser `PAGAR_ME` (omitido responde 400 `gateway is required`; outro valor responde 400 `gateway mismatch`).
 
 ### E. Acompanhar, estornar e cancelar
 

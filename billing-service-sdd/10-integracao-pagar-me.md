@@ -1,8 +1,10 @@
 # SDD 10 — Gateway Pagar.me e Multigateway
 
-> Status: **implementado e testado contra servidor falso** (branch `feature/gateway-pagar-me`). **Não validado contra a
-> API real do Pagar.me**: ver Pendências de validação e o guia `billing-service-api/docs/pagar-me-development-setup.md`.
-> Este documento é a fonte única da mudança.
+> Status: **implementado, mergeado na `main` e em produção desde 2026-11-14** (migration V4 aplicada pelo Flyway).
+> Testado contra servidor falso (52 testes). Contra a **API real do Pagar.me** só foi confirmado o cadastro de
+> credenciais (`PUT /api/merchant/pagar-me` aceitou chaves de teste, também pelo console da plataforma da doistech-store);
+> cobrança, webhook e demais itens seguem em Pendências de validação. Guia:
+> `billing-service-api/docs/pagar-me-development-setup.md`. Este documento é a fonte única da mudança.
 
 ## Objetivo
 
@@ -36,7 +38,7 @@ Cliente: `store-api/.../infrastructure/payment/BilinsBillingGateway.java`. Fake 
 |---|---|
 | `POST /api/customers`, `GET /api/customers/by-reference` | `sourceSystem`, `externalReference`, `name`, `email`, `document`, `phone` |
 | `POST /api/invoices`, `GET /api/invoices/by-reference` | `customerId`, `items[]`, `totalAmount`, `status` |
-| `POST /api/charges` | `invoiceId`, `gateway` (a store envia `"MERCADO_PAGO"`), `method`, `payer`, `card`, `expiresInMinutes`, `amount`; header `Idempotency-Key` |
+| `POST /api/charges` | `invoiceId`, `gateway` (**obrigatório**; a store envia o gateway real do merchant, `MERCADO_PAGO` ou `PAGAR_ME`), `method`, `payer`, `card`, `expiresInMinutes`, `amount`; header `Idempotency-Key` |
 | `GET /api/charges/{id}`, `POST …/sync`, `…/refund`, `…/cancel` | resposta com `pix`, `boleto`, `installments`, `status` |
 | `GET /api/merchant`, `PUT /api/merchant/mercado-pago` | `mercadoPagoConfigured`, `sandbox`, `webhookSignatureEnabled`; corpo `accessToken`, `publicKey`, `webhookSecret`, `sandbox` |
 | `POST /api/admin/merchants` | devolve `merchant.id`, `apiKey`, `callbackSecret` |
@@ -60,8 +62,15 @@ este billing, com `BILLING_ADMIN_API_KEY`) é uma checagem manual a fazer **ante
   `GatewayRefundResponse`, `DirectPaymentRequest`) saem de `gateway.mercadopago` para `gateway`.
 - `MercadoPagoAccount` vira `GatewayAccount` (`id`, `nickname`, `siteId` opcional).
 - Um `PaymentGatewayRouter` escolhe a implementação pelo `gateway` do merchant autenticado.
-- `POST /api/charges` com `gateway` ausente usa o gateway do merchant. Se vier preenchido e **diferente** do
-  gateway do merchant → 400 com mensagem `gateway mismatch: this merchant receives through <GATEWAY>` (a store manda `MERCADO_PAGO` para merchants MP, então segue válido).
+- `POST /api/charges` exige `gateway` (`@NotNull`): ausente → 400 `validation failed: gateway is required`. O desenho
+  original previa usar o gateway do merchant quando omitido, mas a implementação nunca aceitou a omissão (descoberto em
+  produção em 2026-11-14, quando a doistech-store passou a omitir o campo). O valor precisa ser **igual** ao gateway do
+  merchant autenticado; diferente → 400 `gateway mismatch: this merchant receives through <GATEWAY>`. Quem integra
+  deve ler o gateway em `GET /api/merchant` (campo `gateway`) e enviá-lo; a doistech-store faz isso com cache de 5 min
+  por API key. Tornar o campo opcional exigiria mudar `CreateChargeRequest` e é uma decisão em aberto.
+- Nenhum endpoint muda o `gateway` de um merchant existente: trocar de gateway é criar outro merchant (`POST /api/admin/merchants`
+  com `gateway`) e substituir o vínculo no sistema cliente. A doistech-store faz isso para o merchant da plataforma
+  (`code = doistech-plataforma-pagar-me`) e para as lojas.
 
 ### 2. Credenciais Pagar.me no merchant (V4)
 
